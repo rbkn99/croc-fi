@@ -1,0 +1,22 @@
+{
+  "name": "prooflayer-backend",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "sdk",
+    "attestor",
+    "api",
+    "scripts"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev:api": "npm run dev -w @prooflayer/api",
+    "dev:attestor": "npm run dev -w @prooflayer/attestor",
+    "setup": "npm run setup -w @prooflayer/scripts",
+    "demo": "npm run demo -w @prooflayer/scripts"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

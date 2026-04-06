@@ -1,0 +1,118 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// --- KYC & Compliance ---
+
+model KycRecord {
+  id              String       @id @default(cuid())
+  wallet          String       @unique
+  externalId      String?
+  provider        String // sumsub | synaps | manual
+  status          KycStatus    @default(pending)
+  tier            InvestorTier @default(retail)
+  jurisdiction    String?
+  rejectionReason String?
+  verifiedAt      DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  whitelistSyncs WhitelistSync[]
+  auditEntries   AuditEntry[]
+}
+
+model WhitelistSync {
+  id          String   @id @default(cuid())
+  wallet      String
+  assetPubkey String
+  action      String // added | removed | skipped
+  reason      String?
+  txSignature String?
+  createdAt   DateTime @default(now())
+
+  kycRecord KycRecord @relation(fields: [wallet], references: [wallet])
+
+  @@index([wallet, assetPubkey])
+}
+
+// --- Asset Metadata (off-chain issuer data) ---
+
+model AssetMeta {
+  id            String   @id // mtbill-sol, myield-sol
+  name          String
+  ticker        String
+  assetType     String
+  description   String   @db.Text
+  onChainPubkey String?
+  mintPubkey    String?
+  metadata      Json // full AssetMetadata blob (legal, docs, fees, counterparties)
+  policyConfig  Json // PolicyConfig (tier, jurisdictions, attestation rules)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// --- Audit Trail ---
+
+model AuditEntry {
+  id          String   @id @default(cuid())
+  action      String // kyc.started, kyc.approved, whitelist.added, attestation.published
+  actor       String // wallet pubkey or "system"
+  target      String? // affected wallet/asset
+  details     Json?
+  txSignature String?
+  timestamp   DateTime @default(now())
+
+  kycRecord KycRecord? @relation(fields: [kycWallet], references: [wallet])
+  kycWallet String?
+
+  @@index([action])
+  @@index([actor])
+  @@index([timestamp])
+}
+
+// --- Institutional Investor Portal ---
+
+model Institution {
+  id           String       @id @default(cuid())
+  name         String
+  wallet       String       @unique // primary wallet (admin)
+  tier         InvestorTier @default(institutional)
+  jurisdiction String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  members InstitutionMember[]
+}
+
+model InstitutionMember {
+  id        String   @id @default(cuid())
+  wallet    String   @unique
+  role      String // admin | trader | viewer
+  label     String? // "Trading Desk A", "Operations"
+  createdAt DateTime @default(now())
+
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  institutionId String
+
+  @@index([institutionId])
+}
+
+enum KycStatus {
+  pending
+  approved
+  rejected
+  expired
+}
+
+enum InvestorTier {
+  retail
+  accredited
+  qualified_purchaser
+  institutional
+}

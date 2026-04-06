@@ -1,0 +1,23 @@
+[package]
+name = "proof-layer-hook"
+version = "0.1.0"
+description = "ProofLayer Transfer Hook — on-chain compliance enforcement"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "proof_layer_hook"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = "0.31.1"
+anchor-spl = { version = "0.31.1", features = ["token_2022"] }
+spl-transfer-hook-interface = "0.8"
+spl-tlv-account-resolution = "0.8"

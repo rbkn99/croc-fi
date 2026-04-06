@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+:root {
+  /* Light surfaces — inner pages */
+  --color-bg:                #F1F5EE;
+  --color-surface:           #E6EDE2;
+  --color-surface-secondary: #DCE5D8;
+  --color-surface-hover:     #D0DBCC;
+  --color-border:            #C0CCBA;
+  --color-border-subtle:     #D4DFD0;
+
+  /* Text */
+  --color-text:              #0D1C10;
+  --color-text-secondary:    #476050;
+  --color-text-muted:        #88998A;
+
+  /* Semantic */
+  --color-success:           #1A7A3C;
+  --color-warning:           #8A6810;
+  --color-danger:            #8C2222;
+
+  /* Brand — forest green */
+  --color-dark:              #071B0D;
+  --color-dark-surface:      #0D2618;
+  --color-dark-border:       #1A3D24;
+
+  --color-accent:            #177C41;
+  --color-accent-hover:      #125E32;
+  --color-accent-bright:     #2ECC71;
+  --color-accent-glow:       rgba(23,124,65,0.15);
+
+  /* Legacy compat */
+  --color-primary:           #0D1C10;
+  --color-primary-light:     #1A3D22;
+  --color-gold:              #177C41;
+  --color-gold-bright:       #2ECC71;
+  --color-gold-dim:          #476050;
+  --color-gold-glow:         rgba(23,124,65,0.08);
+  --color-background:        var(--color-bg);
+  --color-foreground:        var(--color-text);
+}
+
+@theme inline {
+  --color-background: #F1F5EE;
+  --color-foreground: #0D1C10;
+  --font-sans:        var(--font-barlow);
+  --font-mono:        var(--font-ibm-plex-mono);
+  --font-display:     var(--font-playfair);
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-barlow, system-ui, sans-serif);
+}
+
+.font-display {
+  font-family: var(--font-playfair, Georgia, serif);
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--color-bg); }
+::-webkit-scrollbar-thumb { background: var(--color-border); }

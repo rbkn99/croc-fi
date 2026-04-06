@@ -1,0 +1,23 @@
+{
+  "name": "@prooflayer/scripts",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'Scripts do not need build'",
+    "setup": "tsx setup-localnet.ts",
+    "demo": "tsx demo-flow.ts",
+    "init-program": "tsx init-program.ts",
+    "init-hook": "tsx init-hook.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@prooflayer/sdk": "file:../sdk",
+    "@prooflayer/shared": "file:../shared",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

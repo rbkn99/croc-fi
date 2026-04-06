@@ -1,0 +1,15 @@
+.anchor
+.DS_Store
+target
+**/*.rs.bk
+node_modules
+test-ledger
+.yarn
+.env
+# Solana keypair files
+*-keypair.json
+devnet-usdc.json
+/admz*.json
+/croZ*.json
+/hok7*.json
+/tee7*.json

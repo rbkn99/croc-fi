@@ -1,0 +1,10 @@
+onre-sol-master/
+.DS_Store
+
+# tg-claude-bot
+tg-claude-bot/node_modules/
+tg-claude-bot/dist/
+tg-claude-bot/data/
+tg-claude-bot/.env
+tg-claude-bot/.claude/
+tg-claude-bot/package-lock.json
