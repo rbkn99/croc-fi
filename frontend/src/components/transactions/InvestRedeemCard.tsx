@@ -105,7 +105,7 @@ export function InvestRedeemCard({ asset, navBps }: InvestRedeemCardProps) {
       return;
     }
     startKyc.mutate(undefined, {
-      onSuccess: (data: { verificationUrl?: string }) => {
+      onSuccess: (data) => {
         if (data.verificationUrl) window.open(data.verificationUrl, "_blank");
       },
     });
