@@ -1,5 +1,5 @@
 import { Connection, PublicKey } from "@solana/web3.js";
-import { prisma } from "@prooflayer/shared/src/db";
+import { prisma } from "@prooflayer/shared";
 import { AssetMetaStore } from "./asset-meta-store";
 
 export class InstitutionService {
@@ -45,7 +45,7 @@ export class InstitutionService {
       ...institution.members.map((m) => m.wallet),
     ];
 
-    const assets = this.metaStore.getAll();
+    const assets = await this.metaStore.getAll();
     const holdings: Array<{
       assetId: string;
       ticker: string;
@@ -89,7 +89,7 @@ export class InstitutionService {
     });
     if (!institution) return null;
 
-    const assets = this.metaStore.getAll();
+    const assets = await this.metaStore.getAll();
     const documents: Array<{
       assetId: string;
       assetName: string;

@@ -4,6 +4,7 @@ import { RegistryReader } from "../services/registry-reader";
 import { kycStore } from "../services/kyc-store";
 import { PolicySyncService } from "../services/policy-sync";
 import { InvestorTier, PolicyConfig } from "@prooflayer/shared";
+import { prisma } from "@prooflayer/shared";
 
 export function createIssuerRouter(
   reader: RegistryReader,
@@ -122,6 +123,17 @@ export function createIssuerRouter(
       expiringIn7d: expiring.length,
     };
     res.json(summary);
+  });
+
+  /**
+   * GET /api/v1/issuer/applications
+   * List all submitted issuer applications.
+   */
+  router.get("/applications", async (_req: Request, res: Response) => {
+    const applications = await prisma.issuerApplication.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ applications });
   });
 
   return router;

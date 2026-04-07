@@ -1,11 +1,10 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useState, use } from "react";
+import { useState, use, useEffect } from "react";
 import Link from "next/link";
 import { useSelectedWalletAccount } from "@solana/react";
 import {
-  useAssets,
   useAttestations,
   useWhitelist,
   useRedemptionRequests,
@@ -14,7 +13,11 @@ import {
   useRemoveFromWhitelist,
   useFulfillRedemption,
   useRejectRedemption,
+  useQuickAttest,
 } from "@/lib/solana/hooks";
+import { useProduct } from "@/lib/api/hooks";
+import { findAssetRegistryPda } from "@/lib/solana/generated/src/generated/pdas";
+import { address } from "@solana/kit";
 import { formatPercent, shortenAddress } from "@/lib/solana/format";
 import { StatusBadge } from "@/components/policy/StatusBadge";
 import { AttestationBadge } from "@/components/policy/AttestationBadge";
@@ -90,7 +93,7 @@ function AddWhitelistModal({
 export default function AssetDetailPage({ params }: AssetDetailPageProps) {
   const { id } = use(params);
   const [account] = useSelectedWalletAccount(); const connected = !!account;
-  const { data: assets, isLoading } = useAssets();
+  const { data: product, isLoading } = useProduct(id);
   const { data: allAttestations } = useAttestations();
   const { data: allWhitelist } = useWhitelist();
   const togglePause = useTogglePause();
@@ -98,6 +101,7 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
   const { data: allRedemptions } = useRedemptionRequests();
   const fulfillRedemption = useFulfillRedemption();
   const rejectRedemption = useRejectRedemption();
+  const quickAttest = useQuickAttest();
   const [showAddWl, setShowAddWl] = useState(false);
   const [now] = useState(() => Math.floor(Date.now() / 1000));
 
@@ -109,7 +113,13 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
     );
   }
 
-  const asset = assets?.find((a) => a.pubkey === id);
+  const asset = product ? {
+    pubkey: product.id,
+    mint: product.mintPubkey ?? product.id,
+    assetType: product.assetType,
+    status: product.status ?? "unknown",
+    name: product.name,
+  } : null;
 
   if (!asset) {
     return (
@@ -120,12 +130,25 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
     );
   }
 
-  const attestations = (allAttestations ?? []).filter((a) => a.assetPubkey === id);
+  const assetPk = asset.pubkey;
+  const [registryPda, setRegistryPda] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!asset.mint) return;
+    findAssetRegistryPda({ rwaMint: address(asset.mint) })
+      .then(([pda]) => setRegistryPda(String(pda)))
+      .catch((e) => console.warn("[AssetDetail] failed to derive registry PDA:", e));
+  }, [asset.mint]);
+
+  // Attestations are indexed by registry PDA on-chain, but product.id is the mint pubkey
+  const attestations = (allAttestations ?? []).filter(
+    (a) => a.assetPubkey === registryPda || a.assetPubkey === assetPk
+  );
   const latestAttestation = attestations.length > 0
     ? attestations.reduce((best, a) => (a.publishedAt > best.publishedAt ? a : best), attestations[0])
     : null;
-  const wlEntries = (allWhitelist ?? []).filter((w) => w.assetPubkey === id);
-  const redemptions = (allRedemptions ?? []).filter((r) => r.assetPubkey === id);
+  const wlEntries = (allWhitelist ?? []).filter((w) => w.assetPubkey === assetPk);
+  const redemptions = (allRedemptions ?? []).filter((r) => r.assetPubkey === assetPk);
 
   const hasAttestation = attestations.length > 0;
   const hasWhitelist = wlEntries.length > 0;
@@ -155,16 +178,19 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
           </div>
         </div>
         <div className="flex gap-2">
-          {attestations.length === 0 && (
-            <Link
-              href={`/admin/assets/${id}/attestation-config`}
-              className="px-4 py-2 text-sm font-semibold rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors"
-            >
-              Init Attestation
-            </Link>
-          )}
           <button
-            onClick={() => togglePause.mutate({ assetRegistryPubkey: id, currentStatus: asset.status })}
+            onClick={() => quickAttest.mutate({
+              mintPubkey: asset.mint,
+              navBps: 10000,
+              yieldRateBps: 500,
+            })}
+            disabled={!connected || quickAttest.isPending}
+            className="px-4 py-2 text-sm font-semibold rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors disabled:opacity-40"
+          >
+            {quickAttest.isPending ? "Signing..." : attestations.length === 0 ? "Quick Attest (NAV $1.00)" : "Re-Attest (NAV $1.00)"}
+          </button>
+          <button
+            onClick={() => togglePause.mutate({ assetRegistryPubkey: assetPk, currentStatus: asset.status })}
             disabled={!connected || togglePause.isPending}
             className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-colors disabled:opacity-40 ${
               asset.status === "paused"
@@ -176,6 +202,12 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
           </button>
         </div>
       </div>
+
+      {quickAttest.error && (
+        <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800 break-all">
+          {String((quickAttest.error as Error)?.message ?? quickAttest.error)}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -260,7 +292,7 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
                   <span className="text-sm font-mono text-[var(--color-text)]">{shortenAddress(entry.wallet, 8)}</span>
                   <span className="text-xs text-[var(--color-text-muted)]">{new Date(entry.addedAt * 1000).toLocaleDateString()}</span>
                   <button
-                    onClick={() => removeFromWl.mutate({ assetRegistryPubkey: id, whitelistEntryPubkey: entry.pubkey })}
+                    onClick={() => removeFromWl.mutate({ assetRegistryPubkey: assetPk, whitelistEntryPubkey: entry.pubkey })}
                     className="text-xs text-red-500 hover:text-red-700 font-medium text-right"
                   >
                     Remove
@@ -360,7 +392,7 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
       </div>
 
       {showAddWl && (
-        <AddWhitelistModal assetPubkey={id} onClose={() => setShowAddWl(false)} />
+        <AddWhitelistModal assetPubkey={assetPk} onClose={() => setShowAddWl(false)} />
       )}
     </div>
   );

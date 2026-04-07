@@ -17,6 +17,8 @@ import {
   fixEncoderSize,
   getAddressDecoder,
   getAddressEncoder,
+  getBooleanDecoder,
+  getBooleanEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getI64Decoder,
@@ -77,6 +79,7 @@ export type AssetRegistry = {
   dailyMinted: bigint;
   lastRedeemDay: bigint;
   dailyRedeemed: bigint;
+  requireWhitelist: boolean;
 };
 
 export type AssetRegistryArgs = {
@@ -94,6 +97,7 @@ export type AssetRegistryArgs = {
   dailyMinted: number | bigint;
   lastRedeemDay: number | bigint;
   dailyRedeemed: number | bigint;
+  requireWhitelist: boolean;
 };
 
 /** Gets the encoder for {@link AssetRegistryArgs} account data. */
@@ -115,6 +119,7 @@ export function getAssetRegistryEncoder(): FixedSizeEncoder<AssetRegistryArgs> {
       ["dailyMinted", getU64Encoder()],
       ["lastRedeemDay", getI64Encoder()],
       ["dailyRedeemed", getU64Encoder()],
+      ["requireWhitelist", getBooleanEncoder()],
     ]),
     (value) => ({ ...value, discriminator: ASSET_REGISTRY_DISCRIMINATOR }),
   );
@@ -138,6 +143,7 @@ export function getAssetRegistryDecoder(): FixedSizeDecoder<AssetRegistry> {
     ["dailyMinted", getU64Decoder()],
     ["lastRedeemDay", getI64Decoder()],
     ["dailyRedeemed", getU64Decoder()],
+    ["requireWhitelist", getBooleanDecoder()],
   ]);
 }
 
@@ -207,5 +213,5 @@ export async function fetchAllMaybeAssetRegistry(
 }
 
 export function getAssetRegistrySize(): number {
-  return 147;
+  return 148;
 }

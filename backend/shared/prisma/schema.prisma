@@ -103,6 +103,33 @@ model InstitutionMember {
   @@index([institutionId])
 }
 
+// --- Issuer Applications (token creation metadata) ---
+
+model IssuerApplication {
+  id               String   @id @default(cuid())
+  mintPubkey       String   @unique
+  issuerWallet     String
+  // Institution
+  institutionName  String
+  contactName      String
+  email            String
+  jurisdiction     String?
+  // Product
+  assetType        String
+  aumEstimate      String?
+  description      String?  @db.Text
+  logoUrl          String?
+  minMintAmount    Int      @default(0)
+  minRedeemAmount  Int      @default(0)
+  dailyMintLimit   Int      @default(0)
+  dailyRedeemLimit Int      @default(0)
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([issuerWallet])
+}
+
 enum KycStatus {
   pending
   approved

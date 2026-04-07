@@ -16,7 +16,7 @@ interface ProductResponse {
   apy30d: number;
   tvl: number;
   status: string;
-  isFresh: boolean;
+  isFresh: boolean | null;
   navBps: number;
   yieldRateBps: number;
   mintFeeBps: number;
@@ -24,6 +24,7 @@ interface ProductResponse {
   managementFeeBps: number;
   onChainPubkey: string | null;
   mintPubkey: string | null;
+  imageUrl: string | null;
 }
 
 export function createProductsRouter(
@@ -33,7 +34,7 @@ export function createProductsRouter(
   const router = Router();
 
   router.get("/", async (_req: Request, res: Response) => {
-    const allMeta = metaStore.getAll();
+    const allMeta = await metaStore.getAll();
     const products: ProductResponse[] = [];
 
     for (const meta of allMeta) {
@@ -44,9 +45,52 @@ export function createProductsRouter(
     res.json({ products });
   });
 
+  // GET /api/v1/products/attestations — all products' latest on-chain attestations
+  router.get("/attestations", async (_req: Request, res: Response) => {
+    const allMeta = await metaStore.getAll();
+    const now = Math.floor(Date.now() / 1000);
+    const results: {
+      assetId: string;
+      name: string;
+      ticker: string;
+      navBps: number;
+      yieldRateBps: number;
+      proofHash: string;
+      validUntil: number;
+      publishedAt: number;
+      isFresh: boolean;
+    }[] = [];
+
+    await Promise.all(
+      allMeta.map(async (meta) => {
+        if (!meta.issuerPubkey) return;
+        try {
+          const pubkey = new PublicKey(meta.issuerPubkey);
+          const att = await reader.getAttestation(pubkey);
+          if (!att) return;
+          results.push({
+            assetId: meta.assetId,
+            name: meta.name,
+            ticker: meta.ticker,
+            navBps: att.navBps,
+            yieldRateBps: att.yieldRateBps,
+            proofHash: Buffer.from(att.proofHash).toString("hex"),
+            validUntil: att.validUntil,
+            publishedAt: att.publishedAt,
+            isFresh: att.validUntil > now,
+          });
+        } catch {
+          // skip — on-chain data unavailable for this product
+        }
+      })
+    );
+
+    res.json({ attestations: results });
+  });
+
   router.get("/:id", async (req: Request, res: Response) => {
     const id = String(req.params.id);
-    const meta = metaStore.getByAssetId(id);
+    const meta = await metaStore.getByAssetId(id);
 
     if (!meta) {
       res.status(404).json({ error: "Product not found" });
@@ -73,13 +117,11 @@ async function buildProductResponse(
 ): Promise<ProductResponse> {
   let navBps = NAV_BPS_SCALE;
   let yieldRateBps = 0;
-  let status = "unknown";
-  let isFresh = false;
+  let status = "active";
+  let isFresh: boolean | null = null; // null = no on-chain attestation
 
   if (meta.issuerPubkey) {
     try {
-      // Derive asset PDA from the program — for now use issuerPubkey as a hint
-      // In production, AssetMeta would store the actual on-chain asset PDA
       const pubkey = new PublicKey(meta.issuerPubkey);
       const health = await reader.getAssetHealth(pubkey);
       if (health) {
@@ -113,5 +155,6 @@ async function buildProductResponse(
     managementFeeBps: meta.fees.managementFeeBps,
     onChainPubkey: meta.issuerPubkey ?? null,
     mintPubkey: meta.mintPubkey ?? null,
+    imageUrl: meta.imageUrl ?? null,
   };
 }

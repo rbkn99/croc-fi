@@ -114,6 +114,10 @@ pub mod proof_layer {
         instructions::finalize_attestation::handler(ctx)
     }
 
+    pub fn toggle_whitelist(ctx: Context<ToggleWhitelist>, require_whitelist: bool) -> Result<()> {
+        instructions::toggle_whitelist::handler(ctx, require_whitelist)
+    }
+
     // ── Whitelist ───────────────────────────────────────────────
 
     pub fn add_to_whitelist(ctx: Context<AddToWhitelist>, wallet: Pubkey) -> Result<()> {

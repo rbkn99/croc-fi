@@ -38,7 +38,7 @@ export default function AttestationConfigPage() {
     if (!canSubmit || !asset) return;
 
     await initConfig.mutateAsync({
-      assetRegistryPubkey: asset.pubkey,
+      mintPubkey: asset.mint,
       attestors,
       threshold: Number(threshold),
       toleranceBps: Number(toleranceBps),

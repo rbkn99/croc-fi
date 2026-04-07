@@ -54,6 +54,8 @@ pub struct AssetRegistry {
     pub daily_minted: u64,
     pub last_redeem_day: i64,
     pub daily_redeemed: u64,
+    // Whitelist enforcement (false = open access for all)
+    pub require_whitelist: bool,
 }
 
 #[account]

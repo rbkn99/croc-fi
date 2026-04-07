@@ -1,8 +1,36 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
 import { createApp } from "../app";
+import { prisma } from "@prooflayer/shared";
 
 const { app } = createApp();
+
+beforeAll(async () => {
+  // Seed a test asset in DB
+  await prisma.assetMeta.upsert({
+    where: { id: "mtbill-sol" },
+    update: {},
+    create: {
+      id: "mtbill-sol",
+      name: "mTBILL",
+      ticker: "mTBILL",
+      assetType: "Treasury",
+      description: "Test Treasury product",
+      metadata: {
+        legalStructure: { vehicleType: "SPV", entityName: "Test LLC", jurisdiction: "US", investorRestrictions: [] },
+        underlying: { description: "US T-Bills" },
+        counterparties: [{ role: "custodian", name: "Test Custodian" }],
+        documents: [{ title: "Prospectus", type: "prospectus", url: "https://example.com/doc.pdf" }],
+        fees: { managementFeeBps: 35, performanceFeeBps: 0, mintFeeBps: 10, redeemFeeBps: 10 },
+        links: { website: "https://example.com" },
+      },
+      policyConfig: {
+        requiredTier: "accredited",
+        blockedJurisdictions: ["KP", "IR"],
+      },
+    },
+  });
+});
 
 describe("GET /api/v1/products", () => {
   it("returns products list", async () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { createApp } from "../app";
-import { prisma } from "@prooflayer/shared/src/db";
+import { prisma } from "@prooflayer/shared";
 import { issuerToken } from "./helpers";
 
 const { app } = createApp();

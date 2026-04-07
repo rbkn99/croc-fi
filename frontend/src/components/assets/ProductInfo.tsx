@@ -4,12 +4,13 @@ import { MappedAsset } from "@/lib/solana/hooks";
 import { formatPercent } from "@/lib/solana/format";
 import { AttestationBadge } from "@/components/policy/AttestationBadge";
 import { StatusBadge } from "@/components/policy/StatusBadge";
+import { useAssetMeta } from "@/lib/api/hooks";
 
 interface ProductInfoProps {
   asset: MappedAsset;
   navBps: number | null;
   yieldBps: number | null;
-  attestationFresh: boolean;
+  attestationFresh: boolean | null;
   attestationValidUntil: number;
 }
 
@@ -21,19 +22,29 @@ export function ProductInfo({
   attestationValidUntil,
 }: ProductInfoProps) {
   const price = navBps ? navBps / 10000 : null;
+  const { data: meta } = useAssetMeta(asset.pubkey);
 
   return (
     <div>
       <div className="flex items-start gap-4 mb-5">
-        <div
-          className="w-14 h-14 rounded-full flex items-center justify-center text-white font-extrabold text-sm shrink-0 uppercase"
-          style={{ background: "var(--color-accent)" }}
-        >
-          {asset.assetType.slice(0, 2)}
-        </div>
+        {meta?.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={meta.imageUrl}
+            alt={asset.name}
+            className="w-14 h-14 rounded-full object-contain shrink-0 border border-[var(--color-border)] bg-white"
+          />
+        ) : (
+          <div
+            className="w-14 h-14 rounded-full flex items-center justify-center text-white font-extrabold text-sm shrink-0 uppercase"
+            style={{ background: "var(--color-accent)" }}
+          >
+            {asset.assetType.slice(0, 2)}
+          </div>
+        )}
         <div>
           <h1 className="text-5xl font-extrabold uppercase tracking-tight text-[var(--color-text)] leading-none">
-            {asset.assetType} Asset
+            {meta?.name ?? `${asset.assetType} Asset`}
           </h1>
           <p className="text-xs font-mono text-[var(--color-text-muted)] mt-2 break-all">
             {asset.mint}
@@ -42,12 +53,17 @@ export function ProductInfo({
       </div>
 
       <p className="text-xs text-[var(--color-text-muted)] mb-2">
-        In Partnership With <span className="font-bold text-[var(--color-text-secondary)] uppercase tracking-wide">ProofLayer ↗</span>
+        In Partnership With{" "}
+        <a href="https://prooflayer.io" target="_blank" rel="noopener noreferrer" className="font-bold text-[var(--color-text-secondary)] uppercase tracking-wide hover:text-[var(--color-accent)] transition-colors">
+          ProofLayer ↗
+        </a>
       </p>
 
       <div className="flex items-center gap-2 mb-8">
         <StatusBadge status={asset.status} />
-        <AttestationBadge isFresh={attestationFresh} validUntil={attestationValidUntil} />
+        {attestationFresh !== null && (
+          <AttestationBadge isFresh={attestationFresh} validUntil={attestationValidUntil} />
+        )}
       </div>
 
       {/* Stats row */}

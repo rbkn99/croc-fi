@@ -165,6 +165,7 @@ export interface AssetMetadata {
     mintFeeBps: number;
     redeemFeeBps: number;
   };
+  imageUrl?: string;
   mintPubkey?: string;
   issuerPubkey?: string;
   attestorPubkey?: string;

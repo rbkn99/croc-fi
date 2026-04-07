@@ -6,6 +6,7 @@ import { useWallets, useConnect } from "@wallet-standard/react";
 import { StandardConnect } from "@wallet-standard/features";
 import { shortenAddress } from "@/lib/solana/format";
 import type { UiWallet } from "@wallet-standard/ui";
+import { authenticate, clearAuthToken } from "@/lib/auth";
 
 function ConnectWalletItem({
   wallet,
@@ -22,6 +23,10 @@ function ConnectWalletItem({
     if (accounts.length > 0) {
       setAccount(accounts[0]);
       onConnect();
+      // Authenticate in background — non-blocking, failure is non-fatal
+      authenticate(accounts[0]).catch((err) =>
+        console.warn("JWT auth failed (wallet may not support signMessage):", err)
+      );
     }
   }
 
@@ -67,7 +72,7 @@ export function ConnectButton() {
           {shortenAddress(account.address)}
         </span>
         <button
-          onClick={() => setAccount(undefined)}
+          onClick={() => { setAccount(undefined); clearAuthToken(); }}
           className="px-4 py-2 text-xs font-bold uppercase tracking-widest border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface)] transition-colors"
         >
           Disconnect

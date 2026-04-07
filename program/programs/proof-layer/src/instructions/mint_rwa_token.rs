@@ -26,6 +26,14 @@ pub fn handler(ctx: Context<MintRwaToken>, usdc_amount: u64) -> Result<()> {
         ProofLayerError::BelowMinAmount
     );
 
+    // Enforce whitelist if required by asset
+    if ctx.accounts.asset_registry.require_whitelist {
+        require!(
+            ctx.accounts.whitelist_entry.is_some(),
+            ProofLayerError::NotWhitelisted
+        );
+    }
+
     // Enforce daily mint limit
     let today = clock.unix_timestamp / 86_400;
     let asset = &mut ctx.accounts.asset_registry;
@@ -121,11 +129,12 @@ pub struct MintRwaToken<'info> {
     )]
     pub attestation: Account<'info, AttestationRecord>,
 
+    /// Optional: only required when asset_registry.require_whitelist == true
     #[account(
         seeds = [b"whitelist", asset_registry.key().as_ref(), user.key().as_ref()],
         bump = whitelist_entry.bump,
     )]
-    pub whitelist_entry: Account<'info, WhitelistEntry>,
+    pub whitelist_entry: Option<Account<'info, WhitelistEntry>>,
 
     #[account(mut)]
     pub rwa_mint: InterfaceAccount<'info, Mint>,
@@ -140,7 +149,8 @@ pub struct MintRwaToken<'info> {
     pub user_usdc: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        mut,
+        init_if_needed,
+        payer = user,
         associated_token::mint = usdc_mint,
         associated_token::authority = asset_registry,
     )]

@@ -22,7 +22,7 @@ export interface Product {
   attestationFresh?: boolean;
   attestationValidUntil?: number;
   status: AssetStatus | string;
-  isFresh?: boolean;
+  isFresh?: boolean | null;
   navBps?: number;
   yieldRateBps?: number;
   mintFeeBps?: number;
@@ -30,6 +30,7 @@ export interface Product {
   managementFeeBps?: number;
   onChainPubkey?: string | null;
   mintPubkey?: string | null;
+  imageUrl?: string | null;
 }
 
 export interface AssetHealth {
@@ -163,6 +164,7 @@ export interface AssetMetadata {
     mintFeeBps: number;
     redeemFeeBps: number;
   };
+  imageUrl?: string;
   mintPubkey?: string;
   issuerPubkey?: string;
   attestorPubkey?: string;

@@ -5,6 +5,7 @@ import { useSelectedWalletAccount } from "@solana/react";
 import {
   fetchProducts,
   fetchProduct,
+  fetchProductAttestations,
   fetchHealth,
   fetchAssetHealth,
   fetchAssetAttestation,
@@ -21,9 +22,13 @@ import {
   addAssetDocument,
   removeAssetDocument,
   uploadDocument,
+  fetchStats,
+  fetchPortfolio,
+  fetchActivity,
+  fetchIssuerApplications,
 } from "./client";
-import type { AssetDocument } from "./types";
-import type { UploadResult } from "./client";
+import type { AssetDocument, Product } from "./types";
+import type { UploadResult, StatsResponse, PortfolioResponse, ActivityEntry, ProductAttestation } from "./client";
 
 // --- Products ---
 
@@ -35,10 +40,22 @@ export function useProducts() {
 }
 
 export function useProduct(id: string) {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: ["product", id],
     queryFn: () => fetchProduct(id),
     enabled: !!id,
+    initialData: () => {
+      const cached = queryClient.getQueryData<Product[]>(["products"]);
+      return cached?.find((p) => p.id === id);
+    },
+  });
+}
+
+export function useProductAttestations() {
+  return useQuery<ProductAttestation[]>({
+    queryKey: ["product-attestations"],
+    queryFn: fetchProductAttestations,
   });
 }
 
@@ -212,5 +229,50 @@ export function useRemoveDocument(assetId: string) {
       queryClient.invalidateQueries({ queryKey: ["product", assetId] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
+  });
+}
+
+// --- Stats ---
+
+export function useStats() {
+  return useQuery<StatsResponse>({
+    queryKey: ["stats"],
+    queryFn: fetchStats,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+}
+
+// --- Portfolio ---
+
+export function usePortfolio() {
+  const [account] = useSelectedWalletAccount();
+  return useQuery<PortfolioResponse>({
+    queryKey: ["portfolio", account?.address],
+    queryFn: () => fetchPortfolio(account!.address),
+    enabled: !!account,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
+// --- Activity ---
+
+export function useActivity(limit = 20) {
+  return useQuery<{ activity: ActivityEntry[]; total: number; hasMore: boolean }>({
+    queryKey: ["activity", limit],
+    queryFn: () => fetchActivity(limit),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
+// --- Issuer Applications ---
+
+export function useIssuerApplications() {
+  return useQuery({
+    queryKey: ["issuerApplications"],
+    queryFn: fetchIssuerApplications,
+    staleTime: 30_000,
   });
 }

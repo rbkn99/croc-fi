@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useSelectedWalletAccount } from "@solana/react";
-import { MappedAsset, useMintRwaToken, useRedeemRwaToken } from "@/lib/solana/hooks";
+import { useWallets, useConnect } from "@wallet-standard/react";
+import { StandardConnect } from "@wallet-standard/features";
+import { MappedAsset, useMintRwaToken, useRedeemRwaToken, useTokenBalance } from "@/lib/solana/hooks";
 import { shortenAddress } from "@/lib/solana/format";
-import { useKycStatus, useStartKyc } from "@/lib/api/hooks";
+import { logActivity } from "@/lib/api/client";
 
 const USDC_MINT = process.env.NEXT_PUBLIC_USDC_MINT ?? "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const USDC_DECIMALS = 6;
@@ -16,121 +18,81 @@ interface InvestRedeemCardProps {
   navBps: number;
 }
 
-function KycBanner() {
-  const { data: kyc, isLoading } = useKycStatus();
-  const startKyc = useStartKyc();
-  const [account] = useSelectedWalletAccount();
-  const connected = !!account;
-
-  if (!connected || isLoading) return null;
-
-  if (kyc?.status === "approved") {
-    return (
-      <div className="border px-3 py-2 text-xs flex items-center gap-2"
-        style={{ borderColor: "var(--color-success)", color: "var(--color-success)", background: "rgba(26,122,60,0.06)" }}>
-        <span className="w-2 h-2 rounded-full" style={{ background: "var(--color-success)" }} />
-        KYC verified · {kyc.tier}
-      </div>
-    );
+function WalletBtn({ wallet }: { wallet: Parameters<typeof useConnect>[0] }) {
+  const [, setAccount] = useSelectedWalletAccount();
+  const [isConnecting, connect] = useConnect(wallet);
+  async function handleClick() {
+    const accounts = await connect();
+    if (accounts.length > 0) setAccount(accounts[0]);
   }
-
-  if (kyc?.status === "pending") {
-    return (
-      <div className="border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-        KYC verification in progress...
-      </div>
-    );
-  }
-
-  if (kyc?.status === "rejected") {
-    return (
-      <div className="border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
-        KYC rejected. Please contact support.
-      </div>
-    );
-  }
-
-  if (kyc?.status === "expired") {
-    return (
-      <div className="border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-        KYC expired. Please re-verify.
-        <button onClick={() => startKyc.mutate()} className="ml-2 underline font-medium">
-          Re-verify
-        </button>
-      </div>
-    );
-  }
-
-  return null;
+  return (
+    <button
+      onClick={handleClick}
+      disabled={isConnecting}
+      className="w-full flex items-center gap-3 px-4 py-2.5 border border-[var(--color-border)] hover:border-black transition-colors text-sm font-semibold disabled:opacity-50"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {wallet.icon && <img src={wallet.icon} alt="" className="w-5 h-5 rounded" />}
+      <span>{isConnecting ? "Connecting..." : wallet.name}</span>
+    </button>
+  );
 }
 
 export function InvestRedeemCard({ asset, navBps }: InvestRedeemCardProps) {
   const [tab, setTab] = useState<Tab>("invest");
   const [payAmount, setPayAmount] = useState("");
   const [redeemAmount, setRedeemAmount] = useState("");
-  const [account, setAccount, wallets] = useSelectedWalletAccount();
+  const [account] = useSelectedWalletAccount();
   const connected = !!account;
-  const { data: kyc } = useKycStatus();
-  const startKyc = useStartKyc();
+  const allWallets = useWallets();
+  const connectableWallets = allWallets
+    .filter((w) => w.features.includes(StandardConnect))
+    .filter((w, i, arr) => arr.findIndex((x) => x.name === w.name) === i);
   const mintRwa = useMintRwaToken();
   const redeemRwa = useRedeemRwaToken();
+  const { data: usdcBalance } = useTokenBalance(USDC_MINT, account?.address);
+  const { data: tokenBalance } = useTokenBalance(asset.mint, account?.address);
 
   const price = navBps / 10000;
   const receiveAmount = payAmount ? (parseFloat(payAmount) / price).toFixed(4) : "";
   const receiveUsd = payAmount ? `~$${parseFloat(payAmount).toFixed(2)}` : "~$0.00";
   const redeemUsdcAmount = redeemAmount ? (parseFloat(redeemAmount) * price).toFixed(4) : "0";
 
-  const canInvest = connected && kyc?.status === "approved" && payAmount && parseFloat(payAmount) > 0 && !mintRwa.isPending;
-  const canRedeem = connected && kyc?.status === "approved" && redeemAmount && parseFloat(redeemAmount) > 0 && !redeemRwa.isPending;
+  const canInvest = connected && payAmount && parseFloat(payAmount) > 0 && !mintRwa.isPending;
+  const canRedeem = connected && redeemAmount && parseFloat(redeemAmount) > 0 && !redeemRwa.isPending;
 
   async function handleInvest() {
     if (!canInvest) return;
     const usdcAmount = BigInt(Math.round(parseFloat(payAmount) * 10 ** USDC_DECIMALS));
-    await mintRwa.mutateAsync({ rwaMint: asset.mint, usdcMint: USDC_MINT, usdcAmount });
+    const result = await mintRwa.mutateAsync({ rwaMint: asset.mint, usdcMint: USDC_MINT, usdcAmount });
     setPayAmount("");
+    logActivity({
+      action: "mint",
+      actor: account!.address,
+      target: asset.mint,
+      txSignature: typeof result === "string" ? result : undefined,
+      details: { assetName: asset.name, usdcAmount: parseFloat(payAmount) },
+    }).catch(() => {});
   }
 
   async function handleRedeem() {
     if (!canRedeem) return;
     const amount = BigInt(Math.round(parseFloat(redeemAmount) * 10 ** USDC_DECIMALS));
-    await redeemRwa.mutateAsync({ rwaMint: asset.mint, amount });
+    const result = await redeemRwa.mutateAsync({ rwaMint: asset.mint, amount });
     setRedeemAmount("");
-  }
-
-  function handleGetAccess() {
-    if (!connected) {
-      const firstAccount = wallets.flatMap((w) => w.accounts)[0];
-      if (firstAccount) setAccount(firstAccount);
-      return;
-    }
-    startKyc.mutate(undefined, {
-      onSuccess: (data) => {
-        if (data.verificationUrl) window.open(data.verificationUrl, "_blank");
-      },
-    });
-  }
-
-  function handleConnect() {
-    const firstAccount = wallets.flatMap((w) => w.accounts)[0];
-    if (firstAccount) setAccount(firstAccount);
+    logActivity({
+      action: "redeem",
+      actor: account!.address,
+      target: asset.mint,
+      txSignature: typeof result === "string" ? result : undefined,
+      details: { assetName: asset.name, tokenAmount: parseFloat(redeemAmount) },
+    }).catch(() => {});
   }
 
   const error = mintRwa.error || redeemRwa.error;
 
   return (
     <div className="bg-white border border-[var(--color-border)] w-full max-w-md">
-      {/* Network selector */}
-      <div className="px-6 pt-5 pb-3">
-        <button className="inline-flex items-center gap-2 px-3 py-1.5 border border-[var(--color-border)] text-sm bg-[var(--color-surface)] text-[var(--color-text-secondary)]">
-          <span className="w-4 h-4 rounded-full bg-gradient-to-br from-purple-500 to-fuchsia-500" />
-          <span className="font-bold uppercase tracking-wide text-xs">Solana</span>
-          <svg className="w-3 h-3 ml-0.5" fill="none" viewBox="0 0 16 16" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6l4 4 4-4" />
-          </svg>
-        </button>
-      </div>
-
       {/* Tabs */}
       <div className="px-6">
         <div className="flex border-b border-[var(--color-border)]">
@@ -154,12 +116,21 @@ export function InvestRedeemCard({ asset, navBps }: InvestRedeemCardProps) {
       <div className="px-6 py-5">
         {tab === "invest" && (
           <div className="space-y-4">
-            <KycBanner />
-
             <div>
-              <label className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-muted)] mb-1.5 block">
-                You pay
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-muted)]">
+                  You pay
+                </label>
+                {connected && usdcBalance !== undefined && (
+                  <button
+                    type="button"
+                    onClick={() => setPayAmount(usdcBalance.toFixed(2))}
+                    className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
+                  >
+                    Balance: <span className="font-mono">{usdcBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </button>
+                )}
+              </div>
               <div className="flex items-center justify-between border border-[var(--color-border)] px-4 py-3 focus-within:border-[var(--color-accent)] transition-colors bg-[var(--color-surface)]">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">$</div>
@@ -184,9 +155,16 @@ export function InvestRedeemCard({ asset, navBps }: InvestRedeemCardProps) {
             </div>
 
             <div>
-              <label className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-muted)] mb-1.5 block">
-                You receive
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-muted)]">
+                  You receive
+                </label>
+                {connected && tokenBalance !== undefined && (
+                  <span className="text-xs text-[var(--color-text-muted)]">
+                    Balance: <span className="font-mono">{tokenBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
+                  </span>
+                )}
+              </div>
               <div className="flex items-center justify-between border border-[var(--color-border)] px-4 py-3 bg-[var(--color-surface)]">
                 <div className="flex items-center gap-2">
                   <div
@@ -210,40 +188,23 @@ export function InvestRedeemCard({ asset, navBps }: InvestRedeemCardProps) {
               </div>
             )}
 
-            {!connected && (
-              <>
-                <button
-                  onClick={handleConnect}
-                  className="w-full py-3.5 text-white text-sm font-extrabold uppercase tracking-widest transition-colors"
-                  style={{ background: "var(--color-dark)" }}
-                >
-                  Connect Wallet
-                </button>
-                <button
-                  onClick={handleGetAccess}
-                  className="w-full py-3 text-sm font-bold uppercase tracking-widest border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)] transition-colors"
-                >
-                  Get Access
-                </button>
-              </>
-            )}
-
-            {connected && kyc?.status !== "approved" && (
-              <button
-                onClick={handleGetAccess}
-                disabled={startKyc.isPending || kyc?.status === "pending"}
-                className="w-full py-3.5 text-white text-sm font-extrabold uppercase tracking-widest transition-colors disabled:opacity-40"
-                style={{ background: "var(--color-accent)" }}
-              >
-                {startKyc.isPending
-                  ? "Starting KYC..."
-                  : kyc?.status === "pending"
-                    ? "Verification in progress..."
-                    : "Complete KYC to Invest"}
-              </button>
-            )}
-
-            {connected && kyc?.status === "approved" && (
+            {!connected ? (
+              <div className="space-y-2">
+                {connectableWallets.length > 0 ? (
+                  connectableWallets.map((w) => <WalletBtn key={w.name} wallet={w} />)
+                ) : (
+                  <a
+                    href="https://phantom.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 py-3.5 text-white text-sm font-extrabold uppercase tracking-widest transition-colors"
+                    style={{ background: "var(--color-dark)" }}
+                  >
+                    Install Phantom Wallet
+                  </a>
+                )}
+              </div>
+            ) : (
               <button
                 onClick={handleInvest}
                 disabled={!canInvest}
@@ -258,12 +219,21 @@ export function InvestRedeemCard({ asset, navBps }: InvestRedeemCardProps) {
 
         {tab === "redeem" && (
           <div className="space-y-4">
-            <KycBanner />
-
             <div>
-              <label className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-muted)] mb-1.5 block">
-                You redeem
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-muted)]">
+                  You redeem
+                </label>
+                {connected && tokenBalance !== undefined && (
+                  <button
+                    type="button"
+                    onClick={() => setRedeemAmount(tokenBalance.toFixed(4))}
+                    className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
+                  >
+                    Balance: <span className="font-mono">{tokenBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
+                  </button>
+                )}
+              </div>
               <div className="flex items-center justify-between border border-[var(--color-border)] px-4 py-3 bg-[var(--color-surface)]">
                 <div className="flex items-center gap-2">
                   <div
@@ -290,9 +260,16 @@ export function InvestRedeemCard({ asset, navBps }: InvestRedeemCardProps) {
             </div>
 
             <div>
-              <label className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-muted)] mb-1.5 block">
-                You receive
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-muted)]">
+                  You receive
+                </label>
+                {connected && usdcBalance !== undefined && (
+                  <span className="text-xs text-[var(--color-text-muted)]">
+                    Balance: <span className="font-mono">{usdcBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </span>
+                )}
+              </div>
               <div className="flex items-center justify-between border border-[var(--color-border)] px-4 py-3 bg-[var(--color-surface)]">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">$</div>
@@ -322,13 +299,21 @@ export function InvestRedeemCard({ asset, navBps }: InvestRedeemCardProps) {
                 {redeemRwa.isPending ? "Signing Transaction..." : "Redeem"}
               </button>
             ) : (
-              <button
-                onClick={handleConnect}
-                className="w-full py-3.5 text-white text-sm font-extrabold uppercase tracking-widest transition-colors"
-                style={{ background: "var(--color-dark)" }}
-              >
-                Connect Wallet
-              </button>
+              <div className="space-y-2">
+                {connectableWallets.length > 0 ? (
+                  connectableWallets.map((w) => <WalletBtn key={w.name} wallet={w} />)
+                ) : (
+                  <a
+                    href="https://phantom.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 py-3.5 text-white text-sm font-extrabold uppercase tracking-widest transition-colors"
+                    style={{ background: "var(--color-dark)" }}
+                  >
+                    Install Phantom Wallet
+                  </a>
+                )}
+              </div>
             )}
           </div>
         )}

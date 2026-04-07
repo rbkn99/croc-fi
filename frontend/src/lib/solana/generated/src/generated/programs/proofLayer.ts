@@ -76,6 +76,7 @@ import {
   getResumeAssetInstruction,
   getRevokeIssuerInstructionAsync,
   getSubmitNavVoteInstruction,
+  getToggleWhitelistInstruction,
   getUpdatePlatformConfigInstructionAsync,
   getWithdrawFromVaultInstructionAsync,
   parseAddToWhitelistInstruction,
@@ -95,6 +96,7 @@ import {
   parseResumeAssetInstruction,
   parseRevokeIssuerInstruction,
   parseSubmitNavVoteInstruction,
+  parseToggleWhitelistInstruction,
   parseUpdatePlatformConfigInstruction,
   parseWithdrawFromVaultInstruction,
   type AddToWhitelistAsyncInput,
@@ -124,6 +126,7 @@ import {
   type ParsedResumeAssetInstruction,
   type ParsedRevokeIssuerInstruction,
   type ParsedSubmitNavVoteInstruction,
+  type ParsedToggleWhitelistInstruction,
   type ParsedUpdatePlatformConfigInstruction,
   type ParsedWithdrawFromVaultInstruction,
   type PauseAssetInput,
@@ -133,6 +136,7 @@ import {
   type ResumeAssetInput,
   type RevokeIssuerAsyncInput,
   type SubmitNavVoteInput,
+  type ToggleWhitelistInput,
   type UpdatePlatformConfigAsyncInput,
   type WithdrawFromVaultAsyncInput,
 } from "../instructions";
@@ -277,6 +281,7 @@ export enum ProofLayerInstruction {
   ResumeAsset,
   RevokeIssuer,
   SubmitNavVote,
+  ToggleWhitelist,
   UpdatePlatformConfig,
   WithdrawFromVault,
 }
@@ -476,6 +481,17 @@ export function identifyProofLayerInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([152, 54, 61, 196, 22, 90, 196, 31]),
+      ),
+      0,
+    )
+  ) {
+    return ProofLayerInstruction.ToggleWhitelist;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([195, 60, 76, 129, 146, 45, 67, 143]),
       ),
       0,
@@ -554,6 +570,9 @@ export type ParsedProofLayerInstruction<
   | ({
       instructionType: ProofLayerInstruction.SubmitNavVote;
     } & ParsedSubmitNavVoteInstruction<TProgram>)
+  | ({
+      instructionType: ProofLayerInstruction.ToggleWhitelist;
+    } & ParsedToggleWhitelistInstruction<TProgram>)
   | ({
       instructionType: ProofLayerInstruction.UpdatePlatformConfig;
     } & ParsedUpdatePlatformConfigInstruction<TProgram>)
@@ -685,6 +704,13 @@ export function parseProofLayerInstruction<TProgram extends string>(
         ...parseSubmitNavVoteInstruction(instruction),
       };
     }
+    case ProofLayerInstruction.ToggleWhitelist: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ProofLayerInstruction.ToggleWhitelist,
+        ...parseToggleWhitelistInstruction(instruction),
+      };
+    }
     case ProofLayerInstruction.UpdatePlatformConfig: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -801,6 +827,10 @@ export type ProofLayerPluginInstructions = {
   submitNavVote: (
     input: SubmitNavVoteInput,
   ) => ReturnType<typeof getSubmitNavVoteInstruction> &
+    SelfPlanAndSendFunctions;
+  toggleWhitelist: (
+    input: ToggleWhitelistInput,
+  ) => ReturnType<typeof getToggleWhitelistInstruction> &
     SelfPlanAndSendFunctions;
   updatePlatformConfig: (
     input: UpdatePlatformConfigAsyncInput,
@@ -954,6 +984,11 @@ export function proofLayerProgram() {
             addSelfPlanAndSendFunctions(
               client,
               getSubmitNavVoteInstruction(input),
+            ),
+          toggleWhitelist: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getToggleWhitelistInstruction(input),
             ),
           updatePlatformConfig: (input) =>
             addSelfPlanAndSendFunctions(

@@ -1,14 +1,8 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import { useAssetMeta, useAddDocument, useRemoveDocument, useUploadDocument } from "@/lib/api/hooks";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useAssetMeta, useAddDocument, useRemoveDocument, useUploadDocument, useProducts } from "@/lib/api/hooks";
 import type { AssetDocument } from "@/lib/api/types";
-
-const PRODUCT_IDS = [
-  { id: "mtbill-sol", label: "mTBILL" },
-  { id: "myield-sol", label: "mYIELD" },
-  { id: "mcorp-sol", label: "mCORP" },
-];
 
 const DOC_TYPES: { value: AssetDocument["type"]; label: string }[] = [
   { value: "prospectus", label: "Prospectus / PPM" },
@@ -28,7 +22,14 @@ const inputCls =
   "w-full px-4 py-3 border border-[var(--color-border)] bg-white text-sm font-mono text-black placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-black transition-colors";
 
 export default function DocumentsPage() {
-  const [selectedId, setSelectedId] = useState("mtbill-sol");
+  const { data: products } = useProducts();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (products && products.length > 0 && !selectedId) {
+      setSelectedId(products[0].id);
+    }
+  }, [products, selectedId]);
   const [showForm, setShowForm] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [form, setForm] = useState({
@@ -40,10 +41,10 @@ export default function DocumentsPage() {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: meta, isLoading, error } = useAssetMeta(selectedId);
+  const { data: meta, isLoading, error } = useAssetMeta(selectedId ?? "");
   const uploadDoc = useUploadDocument();
-  const addDoc = useAddDocument(selectedId);
-  const removeDoc = useRemoveDocument(selectedId);
+  const addDoc = useAddDocument(selectedId ?? "");
+  const removeDoc = useRemoveDocument(selectedId ?? "");
 
   const handleFile = useCallback(async (file: File) => {
     try {
@@ -133,8 +134,8 @@ export default function DocumentsPage() {
         <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-text-muted)] mb-3">
           Product Profile
         </p>
-        <div className="flex gap-2">
-          {PRODUCT_IDS.map((p) => (
+        <div className="flex gap-2 flex-wrap">
+          {(products ?? []).map((p) => (
             <button
               key={p.id}
               onClick={() => { setSelectedId(p.id); resetForm(); }}
@@ -144,9 +145,12 @@ export default function DocumentsPage() {
                   : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-black hover:text-black"
               }`}
             >
-              {p.label}
+              {p.ticker || p.name}
             </button>
           ))}
+          {(!products || products.length === 0) && (
+            <p className="text-xs text-[var(--color-text-muted)] py-2">No products yet</p>
+          )}
         </div>
       </div>
 

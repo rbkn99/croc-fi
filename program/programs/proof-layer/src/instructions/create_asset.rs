@@ -43,6 +43,7 @@ pub fn handler(
     asset.daily_minted = 0;
     asset.last_redeem_day = 0;
     asset.daily_redeemed = 0;
+    asset.require_whitelist = false;
 
     emit!(AssetCreated {
         asset: asset.key(),

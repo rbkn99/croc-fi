@@ -102,6 +102,25 @@ export {
   type InitAttestationConfigAsyncInput,
 } from "./generated/src/generated/instructions/initAttestationConfig";
 
+export {
+  getToggleWhitelistInstruction,
+  type ToggleWhitelistInput,
+} from "./generated/src/generated/instructions/toggleWhitelist";
+
+export {
+  getSubmitNavVoteInstruction,
+  type SubmitNavVoteInput,
+} from "./generated/src/generated/instructions/submitNavVote";
+
+export {
+  getFinalizeAttestationInstructionAsync,
+  type FinalizeAttestationAsyncInput,
+} from "./generated/src/generated/instructions/finalizeAttestation";
+
+export {
+  findAttestationConfigPda,
+} from "./generated/src/generated/pdas/attestationConfig";
+
 export type { AssetType, AssetStatus } from "./generated/src/generated/types";
 
 // ── RPC helper ──────────────────────────────────────────────

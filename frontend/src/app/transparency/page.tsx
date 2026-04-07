@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useAssets, useAttestations } from "@/lib/solana/hooks";
+import { useAttestations, useAssets } from "@/lib/solana/hooks";
+import { useProducts } from "@/lib/api/hooks";
 import { formatPercent, shortenAddress } from "@/lib/solana/format";
 
 function timeAgo(unix: number, now: number): string {
@@ -20,23 +21,27 @@ function timeLeft(unix: number, now: number): string {
 }
 
 export default function TransparencyPage() {
-  const { data: assets, isLoading: loadingAssets } = useAssets();
-  const { data: attestations, isLoading: loadingAtt } = useAttestations();
+  const { data: products, isLoading: loadingProducts } = useProducts();
+  const { data: onChainAtts, isLoading: loadingAtts } = useAttestations();
+  const { data: onChainAssets, isLoading: loadingAssets } = useAssets();
   const [now] = useState(() => Math.floor(Date.now() / 1000));
-  const isLoading = loadingAssets || loadingAtt;
+  const isLoading = loadingProducts || loadingAtts || loadingAssets;
 
-  const byAsset = new Map<string, typeof attestations>();
-  for (const att of attestations ?? []) {
-    if (!byAsset.has(att.assetPubkey)) byAsset.set(att.assetPubkey, []);
-    byAsset.get(att.assetPubkey)!.push(att);
-  }
-  for (const [key, list] of byAsset) {
-    byAsset.set(key, [...list!].sort((a, b) => b.publishedAt - a.publishedAt));
+  // Bridge: mintPubkey → on-chain asset PDA (from GPA asset accounts)
+  const mintToAssetPda = new Map<string, string>();
+  for (const asset of onChainAssets ?? []) {
+    mintToAssetPda.set(asset.mint, asset.pubkey);
   }
 
-  const totalAtts = attestations?.length ?? 0;
-  const liveAtts = attestations?.filter((a) => a.validUntil > now).length ?? 0;
-  const totalAssets = assets?.length ?? 0;
+  // attestation lookup by on-chain asset PDA
+  const attByAssetPda = new Map<string, typeof onChainAtts extends (infer T)[] | undefined ? T : never>();
+  for (const att of onChainAtts ?? []) {
+    attByAssetPda.set(att.assetPubkey, att);
+  }
+
+  const totalAtts = onChainAtts?.length ?? 0;
+  const liveAtts = onChainAtts?.filter((a) => a.validUntil > now).length ?? 0;
+  const totalAssets = products?.length ?? 0;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -131,7 +136,7 @@ export default function TransparencyPage() {
           </p>
           <p className="text-3xl font-mono font-bold text-[var(--color-text)] mb-4">
             {isLoading ? "—" : totalAtts > 0
-              ? `$${((attestations ?? []).reduce((s, a) => s + a.navBps, 0) / 10000 / Math.max(totalAtts, 1)).toFixed(2)}`
+              ? `$${((onChainAtts ?? []).reduce((s, a) => s + a.navBps, 0) / 10000 / Math.max(totalAtts, 1)).toFixed(2)}`
               : "$0.00"}
           </p>
           <p className="text-xs text-[var(--color-text-muted)] leading-relaxed mb-5">
@@ -170,50 +175,52 @@ export default function TransparencyPage() {
 
       {/* Attestation records */}
       <div className="space-y-5">
-        {(assets ?? []).map((asset) => {
-          const atts = byAsset.get(asset.pubkey) ?? [];
-          const latest = atts[0];
-          const isFresh = latest ? latest.validUntil > now : false;
+        {(products ?? []).map((product) => {
+          const mintKey = product.mintPubkey ?? product.id;
+          const assetPda = mintToAssetPda.get(mintKey);
+          const att = assetPda ? attByAssetPda.get(assetPda) : undefined;
 
           return (
-            <div key={asset.pubkey} className="border border-[var(--color-border)] bg-white">
+            <div key={product.id} className="border border-[var(--color-border)] bg-white">
 
               {/* Asset header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
                 <div className="flex items-center gap-4">
                   <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-white font-extrabold text-xs uppercase"
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-white font-extrabold text-xs uppercase overflow-hidden"
                     style={{ background: "var(--color-accent)" }}
                   >
-                    {asset.assetType.slice(0, 2)}
+                    {product.imageUrl
+                      ? <img src={product.imageUrl} alt="" className="w-full h-full object-cover" />
+                      : product.ticker.slice(0, 2)}
                   </div>
                   <div>
                     <p className="text-sm font-bold uppercase tracking-wide text-[var(--color-text)]">
-                      {asset.assetType} · {shortenAddress(asset.mint, 8)}
+                      {product.name} · {product.ticker}
                     </p>
                     <p className="text-xs font-mono text-[var(--color-text-muted)] mt-0.5">
-                      Registry: {shortenAddress(asset.pubkey, 6)}
+                      Mint: {shortenAddress(product.mintPubkey ?? product.id, 8)}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className={`text-[0.6rem] font-bold uppercase tracking-widest border px-2.5 py-1 ${
-                    isFresh
+                    att && att.validUntil > now
                       ? "border-[var(--color-success)] text-[var(--color-success)]"
-                      : atts.length === 0
-                        ? "border-[var(--color-text-muted)] text-[var(--color-text-muted)]"
-                        : "border-[var(--color-danger)] text-[var(--color-danger)]"
+                      : att
+                        ? "border-[var(--color-danger)] text-[var(--color-danger)]"
+                        : "border-[var(--color-text-muted)] text-[var(--color-text-muted)]"
                   }`}>
-                    {atts.length === 0 ? "No Attestations" : isFresh ? "Live" : "Stale"}
+                    {!att ? "No Attestations" : att.validUntil > now ? "Live" : "Stale"}
                   </span>
                   <span className="text-xs font-bold uppercase tracking-widest text-[var(--color-text-muted)]">
-                    {atts.length} record{atts.length !== 1 ? "s" : ""}
+                    {att ? "1 record" : "0 records"}
                   </span>
                 </div>
               </div>
 
-              {/* Table */}
-              {atts.length > 0 && (
+              {/* Attestation row */}
+              {att && (
                 <>
                   <div className="grid grid-cols-[1fr_0.7fr_0.7fr_2fr_1fr_0.8fr] gap-4 px-6 py-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)]">
                     {["Published", "NAV", "Yield", "Proof Hash", "Valid Until", "Status"].map((col, i) => (
@@ -223,58 +230,47 @@ export default function TransparencyPage() {
                     ))}
                   </div>
 
-                  {atts.map((att, idx) => {
-                    const fresh = att.validUntil > now;
-                    const isLatest = idx === 0;
-                    return (
-                      <div
-                        key={att.pubkey}
-                        className={`grid grid-cols-[1fr_0.7fr_0.7fr_2fr_1fr_0.8fr] gap-4 px-6 py-4 items-center border-b border-[var(--color-border-subtle)] last:border-b-0 transition-colors ${
-                          isLatest ? "bg-white" : "bg-[var(--color-surface-secondary)] opacity-60"
-                        }`}
-                      >
-                        <div>
-                          <p className="text-sm font-mono text-[var(--color-text)]">{timeAgo(att.publishedAt, now)}</p>
-                          <p className="text-xs font-mono text-[var(--color-text-muted)] mt-0.5">
-                            {new Date(att.publishedAt * 1000).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <p className="text-sm font-mono font-bold text-[var(--color-text)] text-right tabular-nums">
-                          ${(att.navBps / 10000).toFixed(4)}
-                        </p>
-                        <p className="text-sm font-mono font-bold text-right tabular-nums" style={{ color: "var(--color-accent)" }}>
-                          {formatPercent(att.yieldRateBps / 100)}
-                        </p>
-                        <div className="text-right">
-                          <p className="text-xs font-mono text-[var(--color-text-secondary)] break-all">
-                            {att.proofHash.slice(0, 24)}…
-                          </p>
-                          <p className="text-[0.6rem] font-mono text-[var(--color-text-muted)] mt-0.5">
-                            SHA-256 · {att.proofHash.length / 2} bytes
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-mono text-[var(--color-text)]">{timeLeft(att.validUntil, now)}</p>
-                          <p className="text-xs font-mono text-[var(--color-text-muted)] mt-0.5">
-                            {new Date(att.validUntil * 1000).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex justify-end">
-                          <span className={`text-[0.6rem] font-bold uppercase tracking-widest border px-2 py-0.5 ${
-                            fresh
-                              ? "border-[var(--color-success)] text-[var(--color-success)]"
-                              : "border-[var(--color-text-muted)] text-[var(--color-text-muted)]"
-                          }`}>
-                            {fresh ? "Live" : "Expired"}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div className="grid grid-cols-[1fr_0.7fr_0.7fr_2fr_1fr_0.8fr] gap-4 px-6 py-4 items-center bg-white">
+                    <div>
+                      <p className="text-sm font-mono text-[var(--color-text)]">{timeAgo(att.publishedAt, now)}</p>
+                      <p className="text-xs font-mono text-[var(--color-text-muted)] mt-0.5">
+                        {new Date(att.publishedAt * 1000).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <p className="text-sm font-mono font-bold text-[var(--color-text)] text-right tabular-nums">
+                      ${(att.navBps / 10000).toFixed(4)}
+                    </p>
+                    <p className="text-sm font-mono font-bold text-right tabular-nums" style={{ color: "var(--color-accent)" }}>
+                      {formatPercent(att.yieldRateBps / 100)}
+                    </p>
+                    <div className="text-right">
+                      <p className="text-xs font-mono text-[var(--color-text-secondary)] break-all">
+                        {att.proofHash.slice(0, 24)}…
+                      </p>
+                      <p className="text-[0.6rem] font-mono text-[var(--color-text-muted)] mt-0.5">
+                        SHA-256 · {att.proofHash.length / 2} bytes
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-mono text-[var(--color-text)]">{timeLeft(att.validUntil, now)}</p>
+                      <p className="text-xs font-mono text-[var(--color-text-muted)] mt-0.5">
+                        {new Date(att.validUntil * 1000).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex justify-end">
+                      <span className={`text-[0.6rem] font-bold uppercase tracking-widest border px-2 py-0.5 ${
+                        att.validUntil > now
+                          ? "border-[var(--color-success)] text-[var(--color-success)]"
+                          : "border-[var(--color-text-muted)] text-[var(--color-text-muted)]"
+                      }`}>
+                        {att.validUntil > now ? "Live" : "Expired"}
+                      </span>
+                    </div>
+                  </div>
                 </>
               )}
 
-              {atts.length === 0 && (
+              {!att && (
                 <div className="px-6 py-10 text-center text-xs font-bold uppercase tracking-widest text-[var(--color-text-muted)]">
                   Awaiting first attestation
                 </div>
@@ -285,12 +281,9 @@ export default function TransparencyPage() {
       </div>
 
       {!isLoading && totalAtts > 0 && (
-        <div className="mt-8 border-t border-[var(--color-border)] pt-5 flex flex-wrap gap-6">
+        <div className="mt-8 border-t border-[var(--color-border)] pt-5">
           <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-text-muted)]">
             Proof hash — SHA-256 of the off-chain custody document, signed by the attestor keypair
-          </p>
-          <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-text-muted)]">
-            Dimmed rows — superseded attestations (historical record)
           </p>
         </div>
       )}

@@ -1,4 +1,4 @@
-import { prisma } from "@prooflayer/shared/src/db";
+import { prisma } from "@prooflayer/shared";
 import type { Prisma } from "@prisma/client";
 
 export async function logAudit(

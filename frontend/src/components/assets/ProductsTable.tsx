@@ -2,35 +2,27 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { MappedAsset, MappedAttestation } from "@/lib/solana/hooks";
-import { formatPercent, shortenAddress } from "@/lib/solana/format";
+import type { Product } from "@/lib/api/types";
 import { NetworkIcon } from "./NetworkIcon";
 
 interface ProductsTableProps {
-  assets: MappedAsset[];
-  attestations: MappedAttestation[];
+  products: Product[];
 }
 
-export function ProductsTable({ assets, attestations }: ProductsTableProps) {
+export function ProductsTable({ products }: ProductsTableProps) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
 
-  const categories = ["all", ...new Set(assets.map((a) => a.assetType))];
+  const categories = ["all", ...new Set(products.map((p) => p.assetType))];
 
-  const latestAtt = new Map<string, MappedAttestation>();
-  for (const att of attestations) {
-    const existing = latestAtt.get(att.assetPubkey);
-    if (!existing || att.publishedAt > existing.publishedAt) {
-      latestAtt.set(att.assetPubkey, att);
-    }
-  }
-
-  const filtered = assets.filter((a) => {
+  const filtered = products.filter((p) => {
+    const q = search.toLowerCase();
     const matchesSearch =
-      a.pubkey.toLowerCase().includes(search.toLowerCase()) ||
-      a.mint.toLowerCase().includes(search.toLowerCase()) ||
-      a.assetType.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = category === "all" || a.assetType === category;
+      p.name.toLowerCase().includes(q) ||
+      p.ticker.toLowerCase().includes(q) ||
+      (p.mintPubkey ?? "").toLowerCase().includes(q) ||
+      p.assetType.toLowerCase().includes(q);
+    const matchesCategory = category === "all" || p.assetType === category;
     return matchesSearch && matchesCategory;
   });
 
@@ -38,7 +30,6 @@ export function ProductsTable({ assets, attestations }: ProductsTableProps) {
     <div>
       {/* Filters row */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
-        {/* Category dropdowns — styled like Midas filter pills */}
         <div className="flex items-center gap-2 flex-wrap">
           {categories.map((cat) => (
             <button
@@ -55,7 +46,6 @@ export function ProductsTable({ assets, attestations }: ProductsTableProps) {
           ))}
         </div>
 
-        {/* Search */}
         <div className="relative">
           <input
             type="text"
@@ -72,7 +62,6 @@ export function ProductsTable({ assets, attestations }: ProductsTableProps) {
 
       {/* Table */}
       <div className="bg-white border border-[var(--color-border)]">
-        {/* Column headers */}
         <div className="grid grid-cols-[2.5fr_1fr_1fr_1fr_1fr] gap-4 px-5 py-3 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
           {[
             { label: "Product", align: "" },
@@ -88,61 +77,62 @@ export function ProductsTable({ assets, attestations }: ProductsTableProps) {
         </div>
 
         {filtered.length > 0 ? (
-          filtered.map((asset) => {
-            const att = latestAtt.get(asset.pubkey);
-            return (
-              <Link
-                key={asset.pubkey}
-                href={`/products/${asset.pubkey}`}
-                className="group grid grid-cols-[2.5fr_1fr_1fr_1fr_1fr] gap-4 px-5 py-4 items-center border-b border-[var(--color-border-subtle)] last:border-b-0 hover:bg-[var(--color-surface)] transition-colors"
-              >
-                {/* Product */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className="w-9 h-9 flex items-center justify-center text-white font-extrabold text-xs shrink-0 uppercase rounded-full"
-                    style={{ background: "var(--color-accent)" }}
+          filtered.map((product) => (
+            <Link
+              key={product.id}
+              href={`/products/${product.id}`}
+              className="group grid grid-cols-[2.5fr_1fr_1fr_1fr_1fr] gap-4 px-5 py-4 items-center border-b border-[var(--color-border-subtle)] last:border-b-0 hover:bg-[var(--color-surface)] transition-colors"
+            >
+              {/* Product */}
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className="w-9 h-9 flex items-center justify-center text-white font-extrabold text-xs shrink-0 uppercase rounded-full overflow-hidden"
+                  style={{ background: "var(--color-accent)" }}
+                >
+                  {product.imageUrl
+                    ? <img src={product.imageUrl} alt="" className="w-full h-full object-cover" />
+                    : product.ticker.slice(0, 2)}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold uppercase tracking-wide text-[var(--color-text)] group-hover:text-[var(--color-accent)] transition-colors truncate">
+                    {product.name}
+                  </p>
+                  <p
+                    className="text-[0.65rem] font-bold uppercase tracking-widest px-1.5 py-0.5 mt-0.5 inline-block"
+                    style={{
+                      background: "var(--color-accent-glow)",
+                      color: "var(--color-accent)",
+                      border: "1px solid rgba(23,124,65,0.2)",
+                    }}
                   >
-                    {asset.assetType.slice(0, 2)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold uppercase tracking-wide text-[var(--color-text)] group-hover:text-[var(--color-accent)] transition-colors truncate">
-                      {shortenAddress(asset.mint, 6)}
-                    </p>
-                    <p className="text-[0.65rem] font-bold uppercase tracking-widest px-1.5 py-0.5 mt-0.5 inline-block"
-                      style={{
-                        background: "var(--color-accent-glow)",
-                        color: "var(--color-accent)",
-                        border: "1px solid rgba(23,124,65,0.2)",
-                      }}>
-                      {asset.assetType}
-                    </p>
-                  </div>
+                    {product.assetType}
+                  </p>
                 </div>
+              </div>
 
-                {/* Strategy */}
-                <div className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-muted)] text-right">
-                  ProofLayer
-                </div>
+              {/* Strategy */}
+              <div className="text-xs font-bold uppercase tracking-wide text-[var(--color-text-muted)] text-right">
+                ProofLayer
+              </div>
 
-                {/* NAV */}
-                <div className="text-sm font-mono font-semibold text-[var(--color-text)] text-right tabular-nums">
-                  {att ? `$${(att.navBps / 10000).toFixed(4)}` : "—"}
-                </div>
+              {/* NAV */}
+              <div className="text-sm font-mono font-semibold text-[var(--color-text)] text-right tabular-nums">
+                ${product.price.toFixed(4)}
+              </div>
 
-                {/* Yield */}
-                <div className="text-right">
-                  <span className="text-sm font-mono font-bold text-[var(--color-text)]">
-                    {att ? formatPercent(att.yieldRateBps / 100) : "—"}
-                  </span>
-                </div>
+              {/* APY */}
+              <div className="text-right">
+                <span className="text-sm font-mono font-bold text-[var(--color-text)]">
+                  {(product.apy ?? 0) > 0 ? `${(product.apy ?? 0).toFixed(2)}%` : "—"}
+                </span>
+              </div>
 
-                {/* Network */}
-                <div className="flex justify-center">
-                  <NetworkIcon network="solana" size={20} />
-                </div>
-              </Link>
-            );
-          })
+              {/* Network */}
+              <div className="flex justify-center">
+                <NetworkIcon network="solana" size={20} />
+              </div>
+            </Link>
+          ))
         ) : (
           <div className="px-5 py-16 text-center text-xs font-bold uppercase tracking-widest text-[var(--color-text-muted)]">
             No products found

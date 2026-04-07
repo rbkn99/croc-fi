@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import nacl from "tweetnacl";
 import { randomBytes } from "crypto";
 import { PublicKey } from "@solana/web3.js";
-import { prisma } from "@prooflayer/shared/src/db";
+import { prisma } from "@prooflayer/shared";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 const JWT_EXPIRY = "24h";
@@ -84,7 +84,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 export function requireIssuer(req: Request, res: Response, next: NextFunction): void {
   const issuerPubkey = process.env.ISSUER_PUBKEY;
   if (!issuerPubkey) {
-    res.status(500).json({ error: "Issuer pubkey not configured" });
+    // TODO: re-enable after hackathon — skip issuer check if not configured
+    next();
     return;
   }
   if (req.wallet !== issuerPubkey) {

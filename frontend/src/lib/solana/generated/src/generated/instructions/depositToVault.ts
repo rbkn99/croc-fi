@@ -64,6 +64,10 @@ export type DepositToVaultInstruction<
   TAccountIssuerUsdc extends string | AccountMeta<string> = string,
   TAccountTokenProgram extends string | AccountMeta<string> =
     "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -91,6 +95,12 @@ export type DepositToVaultInstruction<
       TAccountTokenProgram extends string
         ? ReadonlyAccount<TAccountTokenProgram>
         : TAccountTokenProgram,
+      TAccountAssociatedTokenProgram extends string
+        ? ReadonlyAccount<TAccountAssociatedTokenProgram>
+        : TAccountAssociatedTokenProgram,
+      TAccountSystemProgram extends string
+        ? ReadonlyAccount<TAccountSystemProgram>
+        : TAccountSystemProgram,
       ...TRemainingAccounts,
     ]
   >;
@@ -137,6 +147,8 @@ export type DepositToVaultAsyncInput<
   TAccountVaultUsdc extends string = string,
   TAccountIssuerUsdc extends string = string,
   TAccountTokenProgram extends string = string,
+  TAccountAssociatedTokenProgram extends string = string,
+  TAccountSystemProgram extends string = string,
 > = {
   issuer: TransactionSigner<TAccountIssuer>;
   assetRegistry?: Address<TAccountAssetRegistry>;
@@ -145,6 +157,8 @@ export type DepositToVaultAsyncInput<
   vaultUsdc?: Address<TAccountVaultUsdc>;
   issuerUsdc?: Address<TAccountIssuerUsdc>;
   tokenProgram?: Address<TAccountTokenProgram>;
+  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
+  systemProgram?: Address<TAccountSystemProgram>;
   amount: DepositToVaultInstructionDataArgs["amount"];
 };
 
@@ -156,6 +170,8 @@ export async function getDepositToVaultInstructionAsync<
   TAccountVaultUsdc extends string,
   TAccountIssuerUsdc extends string,
   TAccountTokenProgram extends string,
+  TAccountAssociatedTokenProgram extends string,
+  TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof PROOF_LAYER_PROGRAM_ADDRESS,
 >(
   input: DepositToVaultAsyncInput<
@@ -165,7 +181,9 @@ export async function getDepositToVaultInstructionAsync<
     TAccountUsdcMint,
     TAccountVaultUsdc,
     TAccountIssuerUsdc,
-    TAccountTokenProgram
+    TAccountTokenProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
 ): Promise<
@@ -177,7 +195,9 @@ export async function getDepositToVaultInstructionAsync<
     TAccountUsdcMint,
     TAccountVaultUsdc,
     TAccountIssuerUsdc,
-    TAccountTokenProgram
+    TAccountTokenProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountSystemProgram
   >
 > {
   // Program address.
@@ -192,6 +212,11 @@ export async function getDepositToVaultInstructionAsync<
     vaultUsdc: { value: input.vaultUsdc ?? null, isWritable: true },
     issuerUsdc: { value: input.issuerUsdc ?? null, isWritable: true },
     tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
+      isWritable: false,
+    },
+    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -268,6 +293,14 @@ export async function getDepositToVaultInstructionAsync<
     accounts.tokenProgram.value =
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
+  }
+  if (!accounts.systemProgram.value) {
+    accounts.systemProgram.value =
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
+  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
   return Object.freeze({
@@ -279,6 +312,8 @@ export async function getDepositToVaultInstructionAsync<
       getAccountMeta("vaultUsdc", accounts.vaultUsdc),
       getAccountMeta("issuerUsdc", accounts.issuerUsdc),
       getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
     ],
     data: getDepositToVaultInstructionDataEncoder().encode(
       args as DepositToVaultInstructionDataArgs,
@@ -292,7 +327,9 @@ export async function getDepositToVaultInstructionAsync<
     TAccountUsdcMint,
     TAccountVaultUsdc,
     TAccountIssuerUsdc,
-    TAccountTokenProgram
+    TAccountTokenProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountSystemProgram
   >);
 }
 
@@ -304,6 +341,8 @@ export type DepositToVaultInput<
   TAccountVaultUsdc extends string = string,
   TAccountIssuerUsdc extends string = string,
   TAccountTokenProgram extends string = string,
+  TAccountAssociatedTokenProgram extends string = string,
+  TAccountSystemProgram extends string = string,
 > = {
   issuer: TransactionSigner<TAccountIssuer>;
   assetRegistry: Address<TAccountAssetRegistry>;
@@ -312,6 +351,8 @@ export type DepositToVaultInput<
   vaultUsdc: Address<TAccountVaultUsdc>;
   issuerUsdc: Address<TAccountIssuerUsdc>;
   tokenProgram?: Address<TAccountTokenProgram>;
+  associatedTokenProgram?: Address<TAccountAssociatedTokenProgram>;
+  systemProgram?: Address<TAccountSystemProgram>;
   amount: DepositToVaultInstructionDataArgs["amount"];
 };
 
@@ -323,6 +364,8 @@ export function getDepositToVaultInstruction<
   TAccountVaultUsdc extends string,
   TAccountIssuerUsdc extends string,
   TAccountTokenProgram extends string,
+  TAccountAssociatedTokenProgram extends string,
+  TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof PROOF_LAYER_PROGRAM_ADDRESS,
 >(
   input: DepositToVaultInput<
@@ -332,7 +375,9 @@ export function getDepositToVaultInstruction<
     TAccountUsdcMint,
     TAccountVaultUsdc,
     TAccountIssuerUsdc,
-    TAccountTokenProgram
+    TAccountTokenProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
 ): DepositToVaultInstruction<
@@ -343,7 +388,9 @@ export function getDepositToVaultInstruction<
   TAccountUsdcMint,
   TAccountVaultUsdc,
   TAccountIssuerUsdc,
-  TAccountTokenProgram
+  TAccountTokenProgram,
+  TAccountAssociatedTokenProgram,
+  TAccountSystemProgram
 > {
   // Program address.
   const programAddress = config?.programAddress ?? PROOF_LAYER_PROGRAM_ADDRESS;
@@ -357,6 +404,11 @@ export function getDepositToVaultInstruction<
     vaultUsdc: { value: input.vaultUsdc ?? null, isWritable: true },
     issuerUsdc: { value: input.issuerUsdc ?? null, isWritable: true },
     tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
+      isWritable: false,
+    },
+    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -371,6 +423,14 @@ export function getDepositToVaultInstruction<
     accounts.tokenProgram.value =
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
+  }
+  if (!accounts.systemProgram.value) {
+    accounts.systemProgram.value =
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
+  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
   return Object.freeze({
@@ -382,6 +442,8 @@ export function getDepositToVaultInstruction<
       getAccountMeta("vaultUsdc", accounts.vaultUsdc),
       getAccountMeta("issuerUsdc", accounts.issuerUsdc),
       getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
     ],
     data: getDepositToVaultInstructionDataEncoder().encode(
       args as DepositToVaultInstructionDataArgs,
@@ -395,7 +457,9 @@ export function getDepositToVaultInstruction<
     TAccountUsdcMint,
     TAccountVaultUsdc,
     TAccountIssuerUsdc,
-    TAccountTokenProgram
+    TAccountTokenProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountSystemProgram
   >);
 }
 
@@ -412,6 +476,8 @@ export type ParsedDepositToVaultInstruction<
     vaultUsdc: TAccountMetas[4];
     issuerUsdc: TAccountMetas[5];
     tokenProgram: TAccountMetas[6];
+    associatedTokenProgram: TAccountMetas[7];
+    systemProgram: TAccountMetas[8];
   };
   data: DepositToVaultInstructionData;
 };
@@ -424,12 +490,12 @@ export function parseDepositToVaultInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedDepositToVaultInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 7) {
+  if (instruction.accounts.length < 9) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 7,
+        expectedAccountMetas: 9,
       },
     );
   }
@@ -449,6 +515,8 @@ export function parseDepositToVaultInstruction<
       vaultUsdc: getNextAccount(),
       issuerUsdc: getNextAccount(),
       tokenProgram: getNextAccount(),
+      associatedTokenProgram: getNextAccount(),
+      systemProgram: getNextAccount(),
     },
     data: getDepositToVaultInstructionDataDecoder().decode(instruction.data),
   };

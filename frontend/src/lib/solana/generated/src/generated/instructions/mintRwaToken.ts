@@ -177,6 +177,7 @@ export type MintRwaTokenAsyncInput<
   user: TransactionSigner<TAccountUser>;
   assetRegistry?: Address<TAccountAssetRegistry>;
   attestation?: Address<TAccountAttestation>;
+  /** Optional: only required when asset_registry.require_whitelist == true */
   whitelistEntry?: Address<TAccountWhitelistEntry>;
   rwaMint: Address<TAccountRwaMint>;
   usdcMint: Address<TAccountUsdcMint>;
@@ -450,7 +451,8 @@ export type MintRwaTokenInput<
   user: TransactionSigner<TAccountUser>;
   assetRegistry: Address<TAccountAssetRegistry>;
   attestation: Address<TAccountAttestation>;
-  whitelistEntry: Address<TAccountWhitelistEntry>;
+  /** Optional: only required when asset_registry.require_whitelist == true */
+  whitelistEntry?: Address<TAccountWhitelistEntry>;
   rwaMint: Address<TAccountRwaMint>;
   usdcMint: Address<TAccountUsdcMint>;
   userUsdc: Address<TAccountUserUsdc>;
@@ -610,7 +612,8 @@ export type ParsedMintRwaTokenInstruction<
     user: TAccountMetas[0];
     assetRegistry: TAccountMetas[1];
     attestation: TAccountMetas[2];
-    whitelistEntry: TAccountMetas[3];
+    /** Optional: only required when asset_registry.require_whitelist == true */
+    whitelistEntry?: TAccountMetas[3] | undefined;
     rwaMint: TAccountMetas[4];
     usdcMint: TAccountMetas[5];
     userUsdc: TAccountMetas[6];
@@ -647,13 +650,19 @@ export function parseMintRwaTokenInstruction<
     accountIndex += 1;
     return accountMeta;
   };
+  const getNextOptionalAccount = () => {
+    const accountMeta = getNextAccount();
+    return accountMeta.address === PROOF_LAYER_PROGRAM_ADDRESS
+      ? undefined
+      : accountMeta;
+  };
   return {
     programAddress: instruction.programAddress,
     accounts: {
       user: getNextAccount(),
       assetRegistry: getNextAccount(),
       attestation: getNextAccount(),
-      whitelistEntry: getNextAccount(),
+      whitelistEntry: getNextOptionalAccount(),
       rwaMint: getNextAccount(),
       usdcMint: getNextAccount(),
       userUsdc: getNextAccount(),

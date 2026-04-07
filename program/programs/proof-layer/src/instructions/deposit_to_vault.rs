@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 use crate::error::ProofLayerError;
@@ -50,7 +51,8 @@ pub struct DepositToVault<'info> {
     pub usdc_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
-        mut,
+        init_if_needed,
+        payer = issuer,
         associated_token::mint = usdc_mint,
         associated_token::authority = asset_registry,
     )]
@@ -64,4 +66,6 @@ pub struct DepositToVault<'info> {
     pub issuer_usdc: InterfaceAccount<'info, TokenAccount>,
 
     pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
 }

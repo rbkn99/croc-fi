@@ -23,5 +23,6 @@ export * from "./removeFromWhitelist";
 export * from "./resumeAsset";
 export * from "./revokeIssuer";
 export * from "./submitNavVote";
+export * from "./toggleWhitelist";
 export * from "./updatePlatformConfig";
 export * from "./withdrawFromVault";

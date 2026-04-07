@@ -10,7 +10,8 @@
     "scripts"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "start": "sh start.sh",
+    "build": "npx prisma generate --schema=shared/prisma/schema.prisma && npm run build --workspaces",
     "dev:api": "npm run dev -w @prooflayer/api",
     "dev:attestor": "npm run dev -w @prooflayer/attestor",
     "setup": "npm run setup -w @prooflayer/scripts",

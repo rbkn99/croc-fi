@@ -3,7 +3,8 @@ export const dynamic = "force-dynamic";
 
 import { useState } from "react";
 import Link from "next/link";
-import { useAssets, useAttestations } from "@/lib/solana/hooks";
+import { useAttestations } from "@/lib/solana/hooks";
+import { useProducts } from "@/lib/api/hooks";
 import { shortenAddress } from "@/lib/solana/format";
 import { StatusBadge } from "@/components/policy/StatusBadge";
 
@@ -22,21 +23,21 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 }
 
 export default function AdminOverview() {
-  const { data: assets, isLoading: loadingAssets } = useAssets();
+  const { data: products, isLoading: loadingProducts } = useProducts();
   const { data: attestations } = useAttestations();
   const [now] = useState(() => Math.floor(Date.now() / 1000));
 
-  if (loadingAssets) {
+  if (loadingProducts) {
     return (
       <div className="p-6 lg:p-8">
         <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-text-muted)]">
-          Loading on-chain data…
+          Loading…
         </p>
       </div>
     );
   }
 
-  const list = assets ?? [];
+  const list = products ?? [];
 
   const latestAttestationByAsset = new Map<
     string,
@@ -117,33 +118,33 @@ export default function AdminOverview() {
               No assets registered yet
             </p>
           ) : (
-            list.map((asset) => {
-              const att = latestAttestationByAsset.get(asset.pubkey);
+            list.map((product) => {
+              const att = latestAttestationByAsset.get(product.id);
               return (
                 <Link
-                  key={asset.pubkey}
-                  href={`/admin/assets/${asset.pubkey}`}
+                  key={product.id}
+                  href={`/admin/assets/${product.id}`}
                   className="grid grid-cols-[2fr_1fr_1fr_1fr_0.8fr] gap-4 px-6 py-4 items-center hover:bg-[var(--color-surface)] transition-colors border-b border-[var(--color-border-subtle)] last:border-b-0"
                 >
                   <div>
                     <p className="text-base font-bold uppercase tracking-wide text-black">
-                      {shortenAddress(asset.mint, 6)}
+                      {product.name}
                     </p>
                     <p className="text-xs font-mono text-[var(--color-text-muted)] mt-0.5">
-                      {shortenAddress(asset.pubkey, 6)}
+                      {shortenAddress(product.mintPubkey ?? product.id, 6)}
                     </p>
                   </div>
                   <p className="text-sm font-bold uppercase tracking-wide text-[var(--color-text-secondary)] text-right">
-                    {asset.assetType}
+                    {product.assetType}
                   </p>
                   <p className="text-base font-mono font-semibold text-black text-right tabular-nums">
-                    {att ? (att.navBps / 10000).toFixed(4) : "—"}
+                    {att ? (att.navBps / 10000).toFixed(4) : `$${product.price.toFixed(4)}`}
                   </p>
                   <p className="text-sm font-mono font-bold text-black text-right tabular-nums">
-                    {att ? `${(att.yieldBps / 100).toFixed(2)}%` : "—"}
+                    {att ? `${(att.yieldBps / 100).toFixed(2)}%` : (product.apy ?? 0) > 0 ? `${(product.apy ?? 0).toFixed(2)}%` : "—"}
                   </p>
                   <div className="flex justify-center">
-                    <StatusBadge status={asset.status} />
+                    <StatusBadge status={product.status} />
                   </div>
                 </Link>
               );

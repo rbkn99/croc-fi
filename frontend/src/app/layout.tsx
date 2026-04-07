@@ -3,6 +3,7 @@ import { Barlow_Condensed, IBM_Plex_Mono, Playfair_Display } from "next/font/goo
 import { Providers } from "./providers";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const barlowCondensed = Barlow_Condensed({
@@ -47,6 +48,7 @@ export default function RootLayout({
           <Header />
           <main className="flex-1">{children}</main>
           <Footer />
+          <Toaster position="bottom-right" richColors />
         </Providers>
       </body>
     </html>

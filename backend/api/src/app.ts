@@ -15,15 +15,29 @@ import { createIssuerRouter } from "./routes/issuer";
 import { createAuthRouter } from "./routes/auth";
 import { createProductsRouter } from "./routes/products";
 import { createInstitutionRouter } from "./routes/institution";
-import { createUploadsRouter, UPLOADS_DIR } from "./routes/uploads";
+import { createUploadsRouter, createFilesRouter } from "./routes/uploads";
+import { createStatsRouter } from "./routes/stats";
+import { createPortfolioRouter } from "./routes/portfolio";
+import { createActivityRouter } from "./routes/activity";
 import { InstitutionService } from "./services/institution-service";
 import { requireAuth, requireIssuer, requireInstitution } from "./middleware/auth";
 import { errorHandler } from "./middleware/error-handler";
+import { prisma, AssetType } from "@prooflayer/shared";
+
+const ASSET_TYPE_VALUES: Record<string, AssetType> = {
+  Treasury: AssetType.Treasury,
+  CorporateBond: AssetType.CorporateBond,
+  MoneyMarket: AssetType.MoneyMarket,
+  Commodity: AssetType.Commodity,
+};
 
 export function createApp() {
   const config = loadConfig();
 
   const app = express();
+
+  // Trust reverse proxy (Railway, Vercel, etc.)
+  app.set("trust proxy", 1);
 
   // --- Security ---
   app.use(helmet());
@@ -36,13 +50,30 @@ export function createApp() {
 
   app.use(express.json());
 
-  // --- Static file serving ---
-  app.use("/uploads", express.static(UPLOADS_DIR));
-
   // --- Services ---
 
   const reader = new RegistryReader(config.rpcUrl);
   const metaStore = new AssetMetaStore();
+
+  // Backfill: sync any IssuerApplication records that aren't yet in AssetMeta
+  prisma.issuerApplication.findMany().then(async (apps) => {
+    for (const app of apps) {
+      const existing = await metaStore.getByAssetId(app.mintPubkey);
+      if (!existing) {
+        const ticker = app.institutionName.slice(0, 6).toUpperCase().replace(/\s/g, "");
+        await metaStore.upsert(app.mintPubkey, {
+          name: app.institutionName,
+          ticker,
+          assetType: ASSET_TYPE_VALUES[app.assetType] ?? AssetType.Treasury,
+          description: app.description ?? "",
+          mintPubkey: app.mintPubkey,
+          issuerPubkey: app.issuerWallet,
+          imageUrl: app.logoUrl ?? undefined,
+        });
+        console.log(`[Backfill] Synced IssuerApplication → AssetMeta: ${app.mintPubkey}`);
+      }
+    }
+  }).catch((err) => console.warn("[Backfill] Failed:", err));
   const kycProvider = createKycProvider(config.kyc);
 
   let issuerKeypair: Keypair;
@@ -57,14 +88,18 @@ export function createApp() {
 
   // --- Routes ---
 
-  const serverBaseUrl = `http://localhost:${config.apiPort}`;
-
   // Public
   app.use("/api/v1/auth", createAuthRouter());
-  app.use("/api/v1/uploads", createUploadsRouter(serverBaseUrl));
+  app.use("/api/v1/uploads", createUploadsRouter());
+  app.use("/api/v1/files", createFilesRouter());
   app.use("/api/v1/products", createProductsRouter(reader, metaStore));
   app.use("/api/v1/assets", createAssetsRouter(reader, metaStore));
   app.use("/api/v1/kyc", createKycRouter(kycProvider, policySyncService));
+  app.use("/api/v1/stats", createStatsRouter(reader, metaStore, config.rpcUrl));
+  app.use("/api/v1/activity", createActivityRouter());
+
+  // Protected: any authenticated wallet
+  app.use("/api/v1/portfolio", createPortfolioRouter(reader, metaStore, config.rpcUrl));
 
   // Protected: issuer only
   app.use("/api/v1/issuer", requireAuth, requireIssuer, createIssuerRouter(reader, policySyncService));
@@ -79,6 +114,11 @@ export function createApp() {
       cluster: config.cluster,
       kycProvider: config.kyc.provider,
     });
+  });
+
+  // Root redirect for health checks / uptime monitors
+  app.get("/", (_req, res) => {
+    res.redirect("/api/v1/health");
   });
 
   app.use(errorHandler);

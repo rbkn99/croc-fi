@@ -1,4 +1,4 @@
-import { prisma } from "@prooflayer/shared/src/db";
+import { prisma } from "@prooflayer/shared";
 import type { KycRecord as PrismaKycRecord, KycStatus as PrismaKycStatus, InvestorTier as PrismaInvestorTier } from "@prisma/client";
 import { KycRecord, KycStatus, InvestorTier } from "@prooflayer/shared";
 
