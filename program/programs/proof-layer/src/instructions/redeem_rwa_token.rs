@@ -46,13 +46,22 @@ pub fn handler(ctx: Context<RedeemRwaToken>, amount: u64) -> Result<()> {
     );
     anchor_spl::token_interface::burn(burn_ctx, amount)?;
 
-    // Create redemption request
+    // Create or update redemption request
     let request = &mut ctx.accounts.redemption_request;
-    request.asset = ctx.accounts.asset_registry.key();
-    request.user = ctx.accounts.user.key();
-    request.amount = amount;
-    request.requested_at = clock.unix_timestamp;
-    request.bump = ctx.bumps.redemption_request;
+    if request.bump != 0 {
+        // Existing request — accumulate amount
+        request.amount = request
+            .amount
+            .checked_add(amount)
+            .ok_or(ProofLayerError::Overflow)?;
+    } else {
+        // New request
+        request.asset = ctx.accounts.asset_registry.key();
+        request.user = ctx.accounts.user.key();
+        request.amount = amount;
+        request.requested_at = clock.unix_timestamp;
+        request.bump = ctx.bumps.redemption_request;
+    }
 
     emit!(RedemptionQueued {
         asset: request.asset,
@@ -88,7 +97,7 @@ pub struct RedeemRwaToken<'info> {
     pub user_rwa: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        init,
+        init_if_needed,
         payer = user,
         space = 8 + RedemptionRequest::INIT_SPACE,
         seeds = [b"redemption", asset_registry.key().as_ref(), user.key().as_ref()],

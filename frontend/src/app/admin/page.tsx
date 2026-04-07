@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { useState } from "react";
 import Link from "next/link";
-import { useAttestations } from "@/lib/solana/hooks";
+import { useAttestations, useAssets } from "@/lib/solana/hooks";
 import { useProducts } from "@/lib/api/hooks";
 import { shortenAddress } from "@/lib/solana/format";
 import { StatusBadge } from "@/components/policy/StatusBadge";
@@ -25,7 +25,14 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 export default function AdminOverview() {
   const { data: products, isLoading: loadingProducts } = useProducts();
   const { data: attestations } = useAttestations();
+  const { data: onChainAssets } = useAssets();
   const [now] = useState(() => Math.floor(Date.now() / 1000));
+
+  // Bridge: mintPubkey → on-chain asset PDA
+  const mintToAssetPda = new Map<string, string>();
+  for (const a of onChainAssets ?? []) {
+    mintToAssetPda.set(a.mint, a.pubkey);
+  }
 
   if (loadingProducts) {
     return (
@@ -119,7 +126,8 @@ export default function AdminOverview() {
             </p>
           ) : (
             list.map((product) => {
-              const att = latestAttestationByAsset.get(product.id);
+              const assetPda = mintToAssetPda.get(product.mintPubkey ?? product.id);
+              const att = assetPda ? latestAttestationByAsset.get(assetPda) : undefined;
               return (
                 <Link
                   key={product.id}

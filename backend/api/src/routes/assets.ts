@@ -86,6 +86,16 @@ export function createAssetsRouter(
     res.json({ documents: updated.documents });
   });
 
+  router.delete("/meta/:assetId", requireAuth, async (req: Request, res: Response) => {
+    const assetId = String(req.params.assetId);
+    const deleted = await metaStore.deleteAsset(assetId);
+    if (!deleted) {
+      res.status(404).json({ error: "Asset not found" });
+      return;
+    }
+    res.json({ status: "deleted", assetId });
+  });
+
   // --- Register new asset (save issuer application to DB) ---
 
   router.post("/register", async (req: Request, res: Response) => {

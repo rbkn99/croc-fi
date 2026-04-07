@@ -48,6 +48,13 @@ export class AssetMetaStore {
     return this.upsert(assetId, { documents: meta.documents });
   }
 
+  async deleteAsset(assetId: string): Promise<boolean> {
+    const existing = await prisma.assetMeta.findUnique({ where: { id: assetId } });
+    if (!existing) return false;
+    await prisma.assetMeta.delete({ where: { id: assetId } });
+    return true;
+  }
+
   async removeDocument(assetId: string, index: number): Promise<AssetMetadata | undefined> {
     const meta = await this.getByAssetId(assetId);
     if (!meta || index < 0 || index >= meta.documents.length) return undefined;

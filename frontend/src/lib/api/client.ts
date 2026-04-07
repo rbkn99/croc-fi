@@ -280,8 +280,9 @@ export interface ActivityEntry {
   timestamp: number;
 }
 
-export async function fetchActivity(limit = 20, offset = 0): Promise<{ activity: ActivityEntry[]; total: number; hasMore: boolean }> {
-  return get(`/activity?limit=${limit}&offset=${offset}`);
+export async function fetchActivity(limit = 20, offset = 0, wallet?: string): Promise<{ activity: ActivityEntry[]; total: number; hasMore: boolean }> {
+  const walletParam = wallet ? `&wallet=${encodeURIComponent(wallet)}` : "";
+  return get(`/activity?limit=${limit}&offset=${offset}${walletParam}`);
 }
 
 export async function logActivity(entry: {

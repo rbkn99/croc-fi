@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useAttestations, useAssets } from "@/lib/solana/hooks";
+import { useQuery } from "@tanstack/react-query";
+import { address } from "@solana/addresses";
+import { useAttestations } from "@/lib/solana/hooks";
+import { findAssetRegistryPda } from "@/lib/solana/generated/src/generated/pdas";
 import { useProducts } from "@/lib/api/hooks";
 import { formatPercent, shortenAddress } from "@/lib/solana/format";
 
@@ -23,18 +26,34 @@ function timeLeft(unix: number, now: number): string {
 export default function TransparencyPage() {
   const { data: products, isLoading: loadingProducts } = useProducts();
   const { data: onChainAtts, isLoading: loadingAtts } = useAttestations();
-  const { data: onChainAssets, isLoading: loadingAssets } = useAssets();
   const [now] = useState(() => Math.floor(Date.now() / 1000));
-  const isLoading = loadingProducts || loadingAtts || loadingAssets;
 
-  // Bridge: mintPubkey → on-chain asset PDA (from GPA asset accounts)
-  const mintToAssetPda = new Map<string, string>();
-  for (const asset of onChainAssets ?? []) {
-    mintToAssetPda.set(asset.mint, asset.pubkey);
-  }
+  // Derive asset registry PDA for every product mint asynchronously
+  const { data: mintToPda } = useQuery({
+    queryKey: ["mint-to-pda", (products ?? []).map((p) => p.mintPubkey ?? p.id).join(",")],
+    queryFn: async () => {
+      const map = new Map<string, string>();
+      await Promise.all(
+        (products ?? []).map(async (p) => {
+          const mint = p.mintPubkey ?? p.id;
+          try {
+            const [pda] = await findAssetRegistryPda({ rwaMint: address(mint) });
+            map.set(p.id, String(pda));
+          } catch {
+            // invalid pubkey, skip
+          }
+        })
+      );
+      return map;
+    },
+    enabled: (products?.length ?? 0) > 0,
+    staleTime: Infinity,
+  });
 
-  // attestation lookup by on-chain asset PDA
-  const attByAssetPda = new Map<string, typeof onChainAtts extends (infer T)[] | undefined ? T : never>();
+  const isLoading = loadingProducts || loadingAtts;
+
+  // Attestation lookup by asset PDA
+  const attByAssetPda = new Map<string, NonNullable<typeof onChainAtts>[number]>();
   for (const att of onChainAtts ?? []) {
     attByAssetPda.set(att.assetPubkey, att);
   }
@@ -46,7 +65,7 @@ export default function TransparencyPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
-      {/* Page header — center-aligned like Midas */}
+      {/* Page header */}
       <div className="text-center mb-10">
         <h1
           className="text-5xl sm:text-6xl font-bold text-[var(--color-text)] mb-3"
@@ -80,7 +99,7 @@ export default function TransparencyPage() {
         ))}
       </div>
 
-      {/* Attestation engine card — like Midas attestation engine */}
+      {/* Attestation engine card */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
         <div className="bg-white border border-[var(--color-border)] p-7">
           <h2 className="text-2xl font-bold text-[var(--color-text)] mb-3">
@@ -124,12 +143,10 @@ export default function TransparencyPage() {
             <h2 className="text-base font-bold uppercase tracking-wide text-[var(--color-text)]">
               Proof of Reserve
             </h2>
-            <div className="flex items-center gap-2">
-              <span className="text-[0.6rem] font-bold uppercase tracking-widest border px-2.5 py-1"
-                style={{ borderColor: "var(--color-accent)", color: "var(--color-accent)" }}>
-                Latest
-              </span>
-            </div>
+            <span className="text-[0.6rem] font-bold uppercase tracking-widest border px-2.5 py-1"
+              style={{ borderColor: "var(--color-accent)", color: "var(--color-accent)" }}>
+              Latest
+            </span>
           </div>
           <p className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--color-text-muted)] mb-1">
             Reserve NAV
@@ -162,22 +179,10 @@ export default function TransparencyPage() {
         </p>
       )}
 
-      {!isLoading && totalAtts === 0 && (
-        <div className="border border-[var(--color-border)] bg-white px-6 py-16 text-center">
-          <p className="text-xs font-bold uppercase tracking-widest text-[var(--color-text-muted)]">
-            No attestations published yet
-          </p>
-          <p className="text-xs text-[var(--color-text-muted)] mt-2">
-            Attestors publish NAV + yield data on-chain every 24h
-          </p>
-        </div>
-      )}
-
-      {/* Attestation records */}
+      {/* Attestation records — one row per API product */}
       <div className="space-y-5">
         {(products ?? []).map((product) => {
-          const mintKey = product.mintPubkey ?? product.id;
-          const assetPda = mintToAssetPda.get(mintKey);
+          const assetPda = mintToPda?.get(product.id);
           const att = assetPda ? attByAssetPda.get(assetPda) : undefined;
 
           return (

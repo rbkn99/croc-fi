@@ -259,9 +259,12 @@ export function usePortfolio() {
 // --- Activity ---
 
 export function useActivity(limit = 20) {
+  const [account] = useSelectedWalletAccount();
+  const wallet = account?.address;
   return useQuery<{ activity: ActivityEntry[]; total: number; hasMore: boolean }>({
-    queryKey: ["activity", limit],
-    queryFn: () => fetchActivity(limit),
+    queryKey: ["activity", limit, wallet],
+    queryFn: () => fetchActivity(limit, 0, wallet),
+    enabled: !!wallet,
     staleTime: 30_000,
     refetchInterval: 60_000,
   });

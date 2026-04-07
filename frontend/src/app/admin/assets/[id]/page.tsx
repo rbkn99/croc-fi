@@ -1,7 +1,7 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useState, use, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useSelectedWalletAccount } from "@solana/react";
 import {
@@ -104,6 +104,16 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
   const quickAttest = useQuickAttest();
   const [showAddWl, setShowAddWl] = useState(false);
   const [now] = useState(() => Math.floor(Date.now() / 1000));
+  const [registryPda, setRegistryPda] = useState<string | null>(null);
+
+  const mintPubkey = product ? (product.mintPubkey ?? product.id) : null;
+
+  useEffect(() => {
+    if (!mintPubkey) return;
+    findAssetRegistryPda({ rwaMint: address(mintPubkey) })
+      .then(([pda]) => setRegistryPda(String(pda)))
+      .catch((e) => console.warn("[AssetDetail] failed to derive registry PDA:", e));
+  }, [mintPubkey]);
 
   if (isLoading) {
     return (
@@ -131,24 +141,19 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
   }
 
   const assetPk = asset.pubkey;
-  const [registryPda, setRegistryPda] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!asset.mint) return;
-    findAssetRegistryPda({ rwaMint: address(asset.mint) })
-      .then(([pda]) => setRegistryPda(String(pda)))
-      .catch((e) => console.warn("[AssetDetail] failed to derive registry PDA:", e));
-  }, [asset.mint]);
-
-  // Attestations are indexed by registry PDA on-chain, but product.id is the mint pubkey
   const attestations = (allAttestations ?? []).filter(
     (a) => a.assetPubkey === registryPda || a.assetPubkey === assetPk
   );
   const latestAttestation = attestations.length > 0
     ? attestations.reduce((best, a) => (a.publishedAt > best.publishedAt ? a : best), attestations[0])
     : null;
-  const wlEntries = (allWhitelist ?? []).filter((w) => w.assetPubkey === assetPk);
-  const redemptions = (allRedemptions ?? []).filter((r) => r.assetPubkey === assetPk);
+  const wlEntries = (allWhitelist ?? []).filter(
+    (w) => w.assetPubkey === registryPda || w.assetPubkey === assetPk
+  );
+  const redemptions = (allRedemptions ?? []).filter(
+    (r) => r.assetPubkey === registryPda || r.assetPubkey === assetPk
+  );
 
   const hasAttestation = attestations.length > 0;
   const hasWhitelist = wlEntries.length > 0;

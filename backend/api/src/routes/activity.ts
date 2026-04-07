@@ -22,13 +22,17 @@ export function createActivityRouter(): Router {
     res.json({ ok: true });
   });
 
-  // GET /api/v1/activity?limit=20&offset=0
+  // GET /api/v1/activity?limit=20&offset=0&wallet=<address>
   router.get("/", async (req: Request, res: Response) => {
     const limit = Math.min(parseInt(String(req.query.limit ?? "20"), 10), 100);
     const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10), 0);
+    const wallet = req.query.wallet ? String(req.query.wallet) : undefined;
+
+    const where = wallet ? { actor: wallet } : {};
 
     const [entries, total] = await Promise.all([
       prisma.auditEntry.findMany({
+        where,
         orderBy: { timestamp: "desc" },
         take: limit,
         skip: offset,
@@ -42,7 +46,7 @@ export function createActivityRouter(): Router {
           timestamp: true,
         },
       }),
-      prisma.auditEntry.count(),
+      prisma.auditEntry.count({ where }),
     ]);
 
     res.json({
